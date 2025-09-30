@@ -40,7 +40,7 @@ station_result_queues = {
     "C4": St4,
 }
 
-CONTROLLER_IP = "192.168.31.36" #192.168.31.36  192.168.0.104
+CONTROLLER_IP = "192.168.31.80" #192.168.31.36  192.168.0.104
 CONTROLLER_PORT = 8888
 timeout = 5
 

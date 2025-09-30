@@ -8,73 +8,56 @@ import time
 import CameraConnection as cs
 import json
 from event_bus import result_event_queue 
+import os
 
 
 app = Flask(__name__)
 show_image_event = Event()
 
 
+def uniq_parts(recipe_rows):
+    return sorted({r['Part_name'] for r in (recipe_rows or [])})
+
+def subparts_for(part, recipe_rows):
+    return sorted({r['Subpart_name'] for r in (recipe_rows or []) if r['Part_name'] == part})
+
+
+
 
 
 @app.route("/", methods=["GET", "POST"])
 def Home():
-    recipe_data = dbscript.get_recipe_master()
-    data = dbscript.get_work_part_details()
-    
-    if recipe_data is not None:
-        part_list = recipe_data['Part_name'].unique().tolist()
-        # Don't pass all subparts initially - they'll be loaded dynamically
-    else:
-        part_list = []
+    recipe_data = dbscript.get_recipe_master()           # list[dict] or None
+    work_data = dbscript.get_work_part_details()         # list[dict]
 
-    return render_template('index.html', 
-                         parts=part_list, 
-                         work_part_details=data)
+    part_list = uniq_parts(recipe_data)
+
+    return render_template(
+        "index.html",
+        parts=part_list,
+        work_part_details=work_data
+    )
+
 
 @app.route('/get_subparts_home', methods=['POST'])
 def get_subparts_home():
     selected_part = request.json.get('part')
-    
-    if selected_part:
-        recipe_data = dbscript.get_recipe_master()
-        if recipe_data is not None:
-            # Filter subparts based on selected part
-            filtered_subparts = recipe_data[recipe_data['Part_name'] == selected_part]['Subpart_name'].unique().tolist()
-            return jsonify({'subparts': filtered_subparts})
-    
-    return jsonify({'subparts': []})
+    recipe_data = dbscript.get_recipe_master()
+    return jsonify({'subparts': subparts_for(selected_part, recipe_data)})
 
 
 @app.route('/StationSettings', methods=["GET", "POST"])
 def StationSettings():
     recipe_data = dbscript.get_recipe_master()
-    
-    if recipe_data is not None:
-        part_list = recipe_data['Part_name'].unique().tolist()
-    else:
-        part_list = []
-
-    # Don't pass subparts initially - they'll be loaded dynamically
+    part_list = uniq_parts(recipe_data)
     return render_template('StationSettings.html', parts=part_list)
+
 
 @app.route('/get_subparts', methods=['POST'])
 def get_subparts():
     selected_part = request.json.get('part')
-    
-    if selected_part:
-        recipe_data = dbscript.get_recipe_master()
-        if recipe_data is not None:
-            # Filter subparts based on selected part
-            filtered_subparts = recipe_data[recipe_data['Part_name'] == selected_part]['Subpart_name'].unique().tolist()
-            return {'subparts': filtered_subparts}
-    
-    return {'subparts': []}
-
-
-
-
-
-
+    recipe_data = dbscript.get_recipe_master()
+    return {'subparts': subparts_for(selected_part, recipe_data)}
 
 @app.route('/get_station_parameters', methods=['POST'])
 def get_station_parameters_route():
@@ -132,31 +115,17 @@ def update_station_parameters():
 
 @app.route('/PartsStationSettings', methods=["GET", "POST"])
 def PartsStationSettings():
-    recipe_data = dbscript.get_recipe_master()
-
-    if recipe_data is not None:
-        part_list = recipe_data['Part_name'].unique().tolist()
-        # Don't pass all subparts initially - they'll be loaded dynamically
-    else:
-        part_list = []
-
-    # Pass rows to template
-    rows = recipe_data.to_dict(orient='records') if recipe_data is not None else []
-
+    recipe_data = dbscript.get_recipe_master() or []
+    part_list = uniq_parts(recipe_data)
+    rows = recipe_data  # already list[dict]
     return render_template('partsettings.html', parts=part_list, rows=rows)
+
 
 @app.route('/get_subparts_parts', methods=['POST'])
 def get_subparts_parts():
     selected_part = request.json.get('part')
-    
-    if selected_part:
-        recipe_data = dbscript.get_recipe_master()
-        if recipe_data is not None:
-            # Filter subparts based on selected part
-            filtered_subparts = recipe_data[recipe_data['Part_name'] == selected_part]['Subpart_name'].unique().tolist()
-            return jsonify({'subparts': filtered_subparts})
-    
-    return jsonify({'subparts': []})
+    recipe_data = dbscript.get_recipe_master()
+    return jsonify({'subparts': subparts_for(selected_part, recipe_data)})
 
 
 @app.route('/PartSettings', methods=["GET", "POST"])
@@ -179,12 +148,12 @@ def PartSettings():
     # GET → fetch settings, parts, defects
     settings = dbscript.get_settings()
 
-    recipe_data = dbscript.get_recipe_master()
-    rows = recipe_data.to_dict(orient='records') if recipe_data is not None else []
-    parts = recipe_data['Part_name'].unique().tolist() if recipe_data is not None else []
+    recipe_data = dbscript.get_recipe_master() or []
+    rows = recipe_data
+    parts = uniq_parts(recipe_data)
 
-    defect_data = dbscript.get_defects()
-    defect_rows = defect_data.to_dict(orient='records') if defect_data is not None else []
+    defect_data = dbscript.get_defects() or []   # list[dict]
+    defect_rows = defect_data
 
     return render_template(
         'Settings.html',
@@ -503,16 +472,11 @@ def static_files(filename):
 
 @app.route("/Report", methods=["GET", "POST"])
 def report():
-    recipe_data = dbscript.get_recipe_master()
-    
-    if recipe_data is not None:
-        part_list = recipe_data['Part_name'].unique().tolist()
-        subpart_list = recipe_data['Subpart_name'].unique().tolist()
-    else:
-        part_list = []
-        subpart_list = []
-    return render_template('Report.html', parts=part_list, 
-                         subparts=subpart_list)
+    recipe_data = dbscript.get_recipe_master() or []
+    part_list = uniq_parts(recipe_data)
+    subpart_list = sorted({r['Subpart_name'] for r in recipe_data})
+    return render_template('Report.html', parts=part_list, subparts=subpart_list)
+
 
 
 @app.route('/add_defect', methods=["POST"])
@@ -549,13 +513,11 @@ def result_stream():
     return Response(event_stream(), mimetype="text/event-stream")
 
 
-
 if __name__ == "__main__":
-      app.run(debug=True, port=9000, threaded=True)
-
-
-
-
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        dbscript.ensure_database_exists()
+        dbscript.ensure_all_tables()
+    app.run(debug=True, port=9000, threaded=True)
 
 
 
