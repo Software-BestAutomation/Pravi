@@ -1,0 +1,539 @@
+{% extends 'Base.html' %} {% block body %}
+
+
+<style>
+    /* General Styling */
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        background-color: #f9f9f9;
+        color: #333;
+        line-height: 1.6;
+    }
+
+    /* Section Layout */
+    section {
+        padding: 20px;
+        margin-top: 30px;
+    }
+
+    /* Row Styling */
+    row {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    label {
+        font-size: larger;
+    }
+
+    /* Input and Select Styling */
+    input,
+    select {
+        padding: 8px 12px;
+        border: 1px solid #18186b;
+        border-radius: 5px;
+        outline: none;
+        transition: border 0.3s;
+    }
+
+    input:focus,
+    select:focus {
+        border-color: #18186b;
+    }
+
+    /* Date and Dropdown Sections */
+    #dSelectDate,
+    #dSelectPartName,
+    #dSupplierInvoice {
+        display: flex;
+        gap: 20px;
+    }
+
+    #dSelectDate {
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        flex-direction: column;
+    }
+
+    #dFromToDate {
+        display: flex;
+        flex-direction: row;
+        column-gap: 1rem;
+    }
+
+
+    #dPartSubPartName {
+        display: flex;
+        flex-direction: row;
+        column-gap: 1rem;
+    }
+
+    div#dSelectPartName {
+
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        flex-direction: column;
+        /* flex-direction: row; */
+    }
+
+    section#secSortData {
+        background: #ffffff;
+        border-radius: 8px;
+        display: flex;
+        padding: 20px;
+        flex-direction: row;
+        column-gap: 30px;
+    }
+
+
+    div#dSupplierInvoice {
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    div#dInputSupplierInvoice {
+        display: flex;
+    }
+
+    /* Report Count Section */
+
+    #secCountReport {
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+    }
+
+    row>label {
+
+        color: black;
+        min-width: 150px;
+    }
+
+    /* Generate Report Button */
+    #secGenerateReport {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        row-gap: 30px;
+        margin-top: 20px;
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+    }
+
+    #btnGenerateReport {
+        background-color: white;
+        color: black;
+        padding: 12px 24px;
+        border: 0.1px solid #18186b;
+        ;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    #btnGenerateReport:hover {
+        background-color: #18186b;
+    }
+
+    #btnRefresh {
+        background-color: white;
+        color: black;
+        padding: 12px 24px;
+        border: 0.1px solid #18186b;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    #btnRefresh:hover {
+        background-color: #18186b;
+    }
+
+    /* Report Table Styling */
+    #ReportTable table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    #ReportTable th,
+    #ReportTable td {
+        padding: 10px;
+        border: 1px solid #18186b;
+        text-align: center;
+    }
+
+    #ReportTable th {
+        background-color: #18186b;
+        color: white;
+        font-weight: bold;
+    }
+
+    #ReportTable tr:nth-child(even) {
+        background-color: #f2f9ff;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        row {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #dSelectDate,
+        #dSelectPartName,
+        #dSupplierInvoice {
+            flex-direction: column;
+        }
+
+        #btnGenerateReport {
+            width: 100%;
+        }
+    }
+
+    /* Scrollable container */
+    .table-container {
+        overflow-x: auto;
+        margin-top: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Table styling */
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', sans-serif;
+        background-color: #fff;
+        color: #333;
+        min-width: 1200px;
+        border-spacing: 0;
+    }
+
+    /* Table header */
+    .report-table thead {
+        background-color: 0;
+        color: #fff;
+    }
+
+    .report-table thead th {
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    /* Table rows */
+    .report-table tbody tr {
+        transition: background-color 0.3s ease;
+    }
+
+    .report-table tbody tr:hover {
+        background-color: #f4f6ff;
+    }
+
+    /* Table cells */
+    .report-table td {
+        padding: 10px 16px;
+        font-size: 13px;
+        vertical-align: middle;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    /* Image styling */
+    .report-table img {
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Scrollbar (optional aesthetic) */
+    .table-container::-webkit-scrollbar {
+        height: 10px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+        background-color: #18186b;
+        border-radius: 10px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+        background-color: #f0f0f0;
+    }
+</style>
+
+<script>
+
+    async function generateReport() {
+        try {
+            // Open file save dialog
+            const fileHandle = await window.showSaveFilePicker({
+                suggestedName: 'report.txt',
+                types: [
+                    {
+                        description: 'Text Files',
+                        accept: { 'text/plain': ['.txt'] },
+                    },
+                ],
+            });
+
+            // Create content for the report
+            const reportContent = "This is your generated report.";
+
+            // Write content to the file
+            const writable = await fileHandle.createWritable();
+            await writable.write(reportContent);
+            await writable.close();
+
+            alert('Report saved successfully!');
+        } catch (err) {
+            console.error('Error saving report:', err);
+        }
+    }
+
+    function enableToDate() {
+        const fromDate = document.getElementById('inpFrom');
+        const toDate = document.getElementById('inpTo');
+
+        // Enable the "To Date" input
+        toDate.removeAttribute('disabled');
+
+        // Set the minimum date for "To Date" to the selected "From Date"
+        toDate.min = fromDate.value;
+
+        // Reset "To Date" if it's earlier than "From Date"
+        if (toDate.value < fromDate.value) {
+            toDate.value = '';
+        }
+        if (fromDate.value == '') {
+            toDate.setAttribute('disabled', 'disabled');
+        }
+    }
+</script>
+
+
+<section>
+    <row>
+
+        <section id="secSortData">
+
+            <div id="dSelectDate">
+                <label style="border-bottom: solid">Select Date</label>
+                <div id="dFromToDate">
+                    <div id="dFromDate">
+                        <label>From Date</label>
+                        <input type="date" id="inpFrom" onchange="enableToDate()">
+                    </div>
+
+                    <div id="dToDate">
+                        <label>To Date</label>
+                        <input type="date" id="inpTo" disabled>
+                    </div>
+                </div>
+
+            </div>
+
+
+
+
+            <div id="dSelectPartName">
+                <label style="border-bottom: solid">Select Parts</label>
+
+                <div id="dPartSubPartName">
+                    <div id="dPartName">
+                        <label>Part Name</label>
+                        <select id="selectpart" name="selectpart" onchange="fetchParameters()">
+                            <option value="">Select Part</option>
+                            {% for part in parts %}
+                            <option value="{{ part }}">{{ part }}</option>
+                            {% endfor %}
+                        </select>
+
+
+                        </select>
+
+                    </div>
+
+                    <div id="dSubPartName">
+                        <label>Sub Part Name</label>
+                        <select id="selectsubpart" name="selectsubpart" onchange="fetchParameters()">
+                            <option value="">Select Subpart</option>
+                            {% for subpart in subparts %}
+                            <option value="{{ subpart }}">{{ subpart }}</option>
+                            {% endfor %}
+                        </select>
+
+                    </div>
+                </div>
+
+
+
+            </div>
+
+
+            <div id="dSupplierInvoice">
+                <label style="border-bottom: solid">Supplier Invoice</label>
+
+                <div id="dInputSupplierInvoice">
+                    <div id="dSupplierName">
+
+                        <label>Supplier Name</label>
+                        <select id="cboSupplierName">
+                            <option>Select</option>
+                        </select>
+
+                    </div>
+
+                    <div id="dInvoice">
+                        <label>Invoice No</label>
+                        <select id="cboInvoice">
+                            <option>Select</option>
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+        </section>
+
+
+
+        <section id="secCountReport">
+
+            <div>
+
+                <row id="rOkQty">
+
+                    <label style="border-bottom: solid">OK Quantity</label>
+
+                    <input type="text" id="txtOkQty">
+
+                </row>
+
+                <row id="rNokQty">
+
+                    <label style="border-bottom: solid">NOK Quantity</label>
+
+                    <input type="text" id="txtNokQty">
+
+                </row>
+
+                <row id="rTotalQty">
+
+                    <label style="border-bottom: solid">Total Quantity</label>
+
+                    <input type="text" id="txtTotalQty">
+
+
+                </row>
+
+
+
+
+            </div>
+
+        </section>
+
+
+        <section id="secGenerateReport">
+
+
+            <button id="btnGenerateReport" onclick="generateReport()">
+                📊 Generate Report
+            </button>
+
+            <button id="btnRefresh" onclick="generateReport()">
+                🔄 Refresh
+            </button>
+
+        </section>
+
+
+
+    </row>
+
+    <row>
+        <section id="ReportTable">
+            <div class="table-container">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>S No</th>
+                            <th>Date Time</th>
+                            <th>Part Name</th>
+                            <th>Sub Part Name</th>
+                            <th>Supplier Name</th>
+                            <th>Invoice No</th>
+                            <th>Part No</th>
+                            <th>Front Defect Output Image</th>
+                            <th>Front Dimension Output Image</th>
+                            <th>Front Result</th>
+                            <th>Front Remarks</th>
+                            <th>Inner Ø</th>
+                            <th>Outer Ø</th>
+                            <th>Orifice Ø</th>
+                            <th>Concentricity</th>
+                            <th>Back Output Image</th>
+                            <th>Back Result</th>
+                            <th>Back Remarks</th>
+                            <th>Side Output Image</th>
+                            <th>Side Result</th>
+                            <th>Side Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>2025-05-06 10:00</td>
+                            <td>Part A</td>
+                            <td>Sub A1</td>
+                            <td>Supplier X</td>
+                            <td>INV-123</td>
+                            <td>PN-456</td>
+                            <td><img src="img1.png" width="60" /></td>
+                            <td><img src="img2.png" width="60" /></td>
+                            <td>OK</td>
+                            <td>None</td>
+                            <td>1.23</td>
+                            <td>2.34</td>
+                            <td>0.98</td>
+                            <td>0.05</td>
+                            <td><img src="img3.png" width="60" /></td>
+                            <td>OK</td>
+                            <td>Clean</td>
+                            <td><img src="img4.png" width="60" /></td>
+                            <td>NOK</td>
+                            <td>Scratch</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </row>
+
+
+</section>
+{% endblock body %}

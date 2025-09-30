@@ -1,0 +1,1418 @@
+{% extends 'Base.html' %} {% block body %}
+
+ <style>
+
+/* ========== GLOBAL ========== */
+body, html {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fb;
+}
+
+/* Headings */
+h1 {
+    display: flex;
+    justify-content: center;
+    color: #2a2a97;
+    width: 1000px;
+    background: linear-gradient(90deg, #e3e9ff, #ffffff);
+    border: 2px dashed #2a2a97;
+    border-radius: 8px;
+    font-size: 100px;
+    letter-spacing: 2px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+h3 {
+    color: #2a2a97;
+    margin-bottom: 0.5rem;
+}
+
+/* ========== BUTTONS ========== */
+button.start-btn {
+    width: 5rem;
+    background: linear-gradient(135deg, #28a745, #5dd65d);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    height: 3rem;
+    transition: transform 0.2s, box-shadow 0.3s;
+}
+button.start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+button.stop-btn {
+    width: 5rem;
+    background: linear-gradient(135deg, #dc3545, #f76c6c);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: 600;
+    height: 3rem;
+    transition: transform 0.2s, box-shadow 0.3s;
+}
+.stop-btn {
+    flex: 0 0 auto;
+    min-width: 5rem;
+}
+button.stop-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.control-btn {
+    background: linear-gradient(135deg, #2a2a97, #4b6fff);
+    color: white;
+    border-radius: 50%;
+    padding: 10px 18px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    transition: transform 0.3s, background 0.3s;
+}
+.control-btn:hover {
+    background: linear-gradient(135deg, #1e1e7a, #3c55d1);
+    transform: rotate(90deg);
+}
+
+/* ========== DROPDOWNS ========== */
+select#selectpart,
+select#selectsubpart {
+    width: 8rem;
+    height: 2rem;
+    padding: 0.3rem;
+    border: 2px solid #2a2a97;
+    border-radius: 5px;
+    background: white;
+    font-weight: 600;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+select#selectpart:hover,
+select#selectsubpart:hover {
+    border-color: #4b6fff;
+    box-shadow: 0 0 6px rgba(75,111,255,0.5);
+}
+
+/* ========== CAMERA STATUS ========== */
+.camera-status-circle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 2px solid #333;
+    margin-top: 5px;
+    background-color: gray;
+    transition: background-color 0.3s, transform 0.2s;
+}
+.camera-status-circle:hover {
+    transform: scale(1.2);
+}
+.camera-connected {
+    background: linear-gradient(135deg, #28a745, #5dd65d);
+}
+.camera-disconnected {
+    background: linear-gradient(135deg, #dc3545, #f76c6c);
+}
+
+/* ========== DETECTION COUNTER ========== */
+.station p span {
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+span:contains("OK") {
+    color: #28a745;
+}
+span:contains("NOK") {
+    color: #dc3545;
+}
+
+/* ========== TABLE ========== */
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1500px;
+    font-size: 0.85rem;
+    background: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.styled-table thead {
+    background: linear-gradient(135deg, #2a2a97, #4b6fff);
+    color: #ffffff;
+}
+.styled-table th, .styled-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #ddd;
+}
+.styled-table tbody tr:nth-child(even) {
+    background-color: #f4f7ff;
+}
+.styled-table tbody tr:hover {
+    background-color: #e1ebff;
+    transition: background-color 0.2s;
+}
+
+/* ========== INPUTS ========== */
+.Dimension-container input,
+.defect-counter input {
+    border: 2px solid #aaa;
+    border-radius: 5px;
+    padding: 0.3rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.Dimension-container input:focus,
+.defect-counter input:focus {
+    border-color: #2a2a97;
+    box-shadow: 0 0 6px rgba(75,111,255,0.5);
+    outline: none;
+}
+
+
+
+
+/* Detection Counter Styling */
+.station p {
+    margin: 6px 0;          /* reduce margin so they fit tighter */
+    font-size: 1rem;        /* slightly larger font */
+    display: flex;
+    justify-content: space-between;
+    width: 8rem;            /* keeps it compact so it won’t overflow */
+}
+
+#cam1-ok, #cam2-ok, #cam3-ok, #cam4-ok {
+    color: #28a745;         /* green for OK */
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+#cam1-nok, #cam2-nok, #cam3-nok, #cam4-nok {
+    color: #dc3545;         /* red for NOK */
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+#cam1-total, #cam2-total, #cam3-total, #cam4-total {
+    color: #2a2a97;         /* blue for Total */
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+#cam1-result, #cam2-result, #cam3-result, #cam4-result {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+    p {
+    color: black;
+}
+  
+
+    .slider-wrapper {
+        width: 100vw;
+        overflow: hidden;
+        position: relative;
+        margin-top: 4rem;
+    }
+
+    .cam-container {
+        display: flex;
+        width: 200vw;
+        height: 100vh;
+        transition: transform 0.5s ease-in-out;
+    }
+
+    .slide {
+        width: 90vw;
+        height: 100vh;
+        flex-shrink: 0;
+    }
+
+    .slide-1 {
+        background-color: white;
+    }
+
+    .slide-2 {
+        background-color: white;
+        margin-left: -33.33vw;
+        /* Keeps 1/3 of Slide 1 visible */
+        display: flex;
+    }
+
+    .controls {
+        position: relative;
+        display: flex;
+        justify-content: left;
+        transform: translateY(-1887%);
+    }
+
+
+
+
+    /* camera style sheet */
+
+
+    .img {
+        width: 100%;
+        height: 22rem;
+        display: flex;
+        border: 2px dashed black;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+    }
+
+   
+
+
+
+
+
+    .defect-circle {
+        width: 2.5rem;
+        height: 2.5rem;
+        background: green;
+        border-radius: 50%;
+    }
+
+    .Controller-status-circle {
+        width: 2.5rem;
+        height: 2.5rem;
+        background: green;
+        border-radius: 50%;
+    }
+
+    .heading {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+
+
+    }
+
+    .cams-container {
+        width: var(--cams-width);
+        margin-right: 40rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        padding: 15px;
+    }
+
+    /* camera style sheet */
+
+
+    .left-section {
+        width: 50%;
+        /* Adjust width as needed */
+        background-color: white;
+    }
+
+
+    .defect-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+
+    .defect-item {
+        padding: 15px;
+        border: 2px solid #333;
+        border-radius: 10px;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+        text-align: center;
+    }
+
+    .defect-label {
+        font-weight: bold;
+    }
+
+    .camera-status {
+        display: flex;
+    }
+
+    .Detection-counter {
+        display: flex;
+    }
+
+
+    .defect-counter {
+        overflow-y: auto;
+        height: 187px;
+        display: flex;
+        justify-content: space-around;
+    }
+
+    .Top-View {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 20px;
+        height: 140px;
+        /* Set the height for scrollability */
+        overflow-y: auto;
+        /* Enable vertical scrolling */
+    }
+
+    .defect-item {
+        display: flex;
+        justify-content: center;
+        flex-direction: row;
+        align-items: center;
+        column-gap: .5rem;
+    }
+
+
+    .right-section {
+        width: 50%;
+    }
+
+    .row-1 {
+        display: grid;
+        grid-template-columns: 70% 30%;
+        padding: 1rem;
+        padding: 1rem;
+        box-shadow: 0 3px 9px -3px black;
+        border-radius: 5px;
+        margin-top: 1rem;
+        margin: 1rem;
+    }
+
+    .row-2,
+    .row-3,
+    .row-4,
+    .row-5 {
+        padding: 1rem;
+        box-shadow: 0 3px 9px -3px black;
+        border-radius: 5px;
+        margin: 1rem;
+    }
+
+    div#camera-status {
+        display: flex;
+        column-gap: 1rem;
+    }
+
+    .camera-1,
+    .camera-2,
+    .camera-3,
+    .camera-4 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .controller-status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .part-selection {
+        display: flex;
+        justify-content: space-around;
+        height: 2.5rem;
+    }
+
+    .Dimension-container {
+        display: flex;
+        flex-direction: row;
+        gap: 1rem;
+    }
+
+    input#Inner-Ø,
+    input#Outer-Ø,
+    input#Orifice-Ø,
+    input#Concentricity-Ø {
+        width: 5rem;
+        height: 2rem;
+    }
+
+    button.start-btn {
+        width: 5rem;
+        background-color: green;
+        color: white;
+        border: black;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 20px;
+        margin-left: 3.5rem;
+        margin-right: 3.5rem;
+        height: 3rem;
+    }
+
+   
+
+
+    .defect-circles {
+        overflow-y: auto;
+        height: 250px;
+        width: 61rem;
+        display: flex;
+        padding: 15px;
+    }
+
+    .camera-result-circle-1,
+    .camera-result-circle-4 {
+        width: 2.5rem;
+        height: 2.5rem;
+        background: green;
+        border-radius: 50%;
+    }
+
+    .camera-result-circle-2,
+    .camera-result-circle-3 {
+        width: 2.5rem;
+        height: 2.5rem;
+        background: red;
+        border-radius: 50%;
+    }
+
+    .cam-result {
+        display: flex;
+        justify-content: space-around;
+    }
+
+    div#cam1,
+    div#cam2,
+    div#cam3,
+    div#cam4 {
+        padding: 5px;
+        box-shadow: 0 3px 9px -3px black;
+        border-radius: 5px;
+    }
+
+    div#cam-status-container {
+        padding: 0.5rem;
+        box-shadow: 0 3px 9px -3px black;
+        border-radius: 5px;
+    }
+
+    .btn-grid {
+        visibility: collapse;
+    }
+
+    select#selectpart,
+    select#selectsubpart {
+        width: 9rem;
+        margin-right: 2.5rem;
+        padding: 0px;
+        height: 2rem;
+    }
+
+    /* Scrollable container for wide tables */
+    .scroll-table-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        margin-top: 10px;
+    }
+
+    /* Base table styling */
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1500px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    /* Table header */
+    .styled-table thead {
+        background-color: gray;
+        color: #ffffff;
+    }
+
+    .styled-table th,
+    .styled-table td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid #dddddd;
+    }
+
+    /* Zebra striping */
+    .styled-table tbody tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    /* Hover effect */
+    .styled-table tbody tr:hover {
+        background-color: #eaf3ff;
+        transition: background-color 0.2s ease-in-out;
+    }
+
+    /* Text overflow control */
+    .styled-table td {
+        word-wrap: break-word;
+        max-width: 220px;
+        white-space: normal;
+    }
+
+    /* Section header */
+    .work-part-detail-table h3 {
+        color: White;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .scroll-table-wrapper {
+        width: 120%;
+        height: 37rem;
+    }
+
+.S1-S2
+{
+    display: flex;
+    column-gap: 5.5rem;
+}
+.S3-S4
+{
+    display: flex;
+    column-gap: 10rem;
+}
+</style>  
+
+
+<div class="slider-wrapper">
+    <div class="cam-container" id="slider">
+        <div class="slide slide-1">
+
+            <div class="main-pg">
+                <div class="cams-container">
+
+                    <div class="cam" id="cam1">
+                        <div class="heading">
+                            <h3>Camera-1</h3>
+                        </div>
+                        <div class="img">
+                            <img src="" alt="Camera 1" width="100%" height="100%" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="cam" id="cam2">
+                        <div class="heading">
+                            <h3>Camera-2</h3>
+                        </div>
+                        <div class="img">
+                            <img src="" alt="Camera 2" width="100%" height="100%" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="cam" id="cam3">
+                        <div class="heading">
+                            <h3>Camera-3</h3>
+                        </div>
+                        <div class="img">
+                            <img src="" alt="Camera 3" width="100%" height="100%" style="display:none;">
+                        </div>
+                    </div>
+
+                    <div class="cam" id="cam4">
+                        <div class="heading">
+                            <h3>Camera-4</h3>
+                        </div>
+                        <div class="img">
+                            <img src="" alt="Camera 4" width="100%" height="100%" style="display:none;">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div>
+
+                </div>
+            </div>
+
+
+
+        </div>
+        <div class="slide slide-2">
+            <div class="left-section">
+
+                <div>
+
+                    <div class="row-1">
+
+
+                        <div id="cam-status-container">
+                            
+                            <h3>Camera Status</h3>
+
+                            <div class="camera-status" id="camera-status">
+
+                                <div class="cam1">
+                                    <h5>Camera-1</h5>
+                                    <div class="camera-status-circle" id="cam1-status"></div>
+                                </div>
+
+                                <div class="cam2">
+                                    <h5>Camera-2</h5>
+                                    <div class="camera-status-circle" id="cam2-status"></div>
+                                </div>
+
+                                <div class="cam3">
+                                    <h5>Camera-3</h5>
+                                    <div class="camera-status-circle" id="cam3-status"></div>
+                                </div>
+
+                                <div class="cam4">
+                                    <h5>Camera-4</h5>
+                                    <div class="camera-status-circle" id="cam4-status"></div>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="controller-status">
+                            <h3>Machine Status</h3>
+
+                            <div class="heading">
+
+
+                            </div>
+
+                            <div class="Controller-status-circle"></div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="row-2">
+
+                        <h3>Part Selection</h3>
+                       <div class="part-selection">
+    <h5>Part:</h5>
+    <select id="selectpart" name="selectpart" onchange="fetchSubpartsForHome()">
+        <option value="">Select Part</option>
+        {% for part in parts %}
+        <option value="{{ part }}">{{ part }}</option>
+        {% endfor %}
+    </select>
+
+    <h5>Subpart:</h5>
+    <select id="selectsubpart" name="selectsubpart" onchange="fetchParameters()">
+        <option value="">Select Subpart</option>
+        <!-- Subparts will be populated dynamically -->
+    </select>
+
+    <button class="start-btn" onclick="sendSpecial('start')">Start</button>
+    <button class="stop-btn" onclick="sendSpecial('stop')">Stop</button>
+
+    <div class="btn-grid">
+        <!-- 23 buttons -->
+        {% for i in range(1, 24) %}
+        <button onclick="sendCommand">Command {{ i }}</button>
+        {% endfor %}
+    </div>
+
+    <div id="output"></div>
+</div>
+
+
+
+                    </div>
+
+                    <div class="row-3">
+
+                        <h3>Detection Counter</h3>
+
+
+                        <div class="S1-S2">
+
+                       <div class="station" id="station1">
+  <h3>Station 1</h3>
+  <p>Result: <span id="cam1-result">--</span></p>
+  <p>OK: <span id="cam1-ok">0</span></p>
+  <p>NOK: <span id="cam1-nok">0</span></p>
+  <p>Total: <span id="cam1-total">0</span></p>
+</div>
+
+<div class="station" id="station2">
+  <h3>Station 2</h3>
+  <p>Result: <span id="cam2-result">--</span></p>
+  <p>OK: <span id="cam2-ok">0</span></p>
+  <p>NOK: <span id="cam2-nok">0</span></p>
+  <p>Total: <span id="cam2-total">0</span></p>
+</div>
+
+
+<div class="station" id="station3">
+  <h3>Station 3</h3>
+  <p>Result: <span id="cam3-result">--</span></p>
+  <p>OK: <span id="cam3-ok">0</span></p>
+  <p>NOK: <span id="cam3-nok">0</span></p>
+  <p>Total: <span id="cam3-total">0</span></p>
+</div>
+
+<div class="station" id="station4">
+  <h3>Station 4</h3>
+  <p>Result: <span id="cam4-result">--</span></p>
+  <p>OK: <span id="cam4-ok">0</span></p>
+  <p>NOK: <span id="cam4-nok">0</span></p>
+  <p>Total: <span id="cam4-total">0</span></p>
+</div>
+
+
+</div>
+
+   <div class="S3-S4">
+
+</div>
+
+
+                    </div>
+
+                    <div class="row-4">
+
+                        <h3>Defect Counter</h3>
+
+                        <div class="defect-counter">
+
+                          <div class="Dimension-cam">
+  <h5>Station 1</h5>
+  <div>
+    <label>Flash on ID</label>
+    <input type="text" id="Flash-on-ID">
+  </div>
+  <div>
+    <label>Flash on OD</label>
+    <input type="text" id="Flash-on-OD">
+  </div>
+  <div hidden>
+    <label>ID</label>
+    <input type="text" id="station1-id">
+  </div>
+  <div hidden>
+    <label>OD</label>
+    <input type="text" id="station1-od">
+  </div>
+</div>
+
+<!-- Station2 -->
+<div class="Thickness-cam">
+  <h5>Station 2</h5>
+  <div>
+    <label>Thickness</label>
+    <input type="text" id="Thickness">
+  </div>
+  <div hidden>
+    <label>Orifice</label>
+    <input type="text" id="Orifice">
+  </div>
+
+  <div hidden>
+  <label>Vertical Flash</label>
+  <input type="text" id="VerticalFlash">
+</div>
+
+</div>
+
+<!-- Station3 -->
+<div class="Top-burr-cam">
+  <h5>Station 3</h5>
+  <div>
+    <label>Top Burr</label>
+    <input type="text" id="Top-Burr">
+  </div>
+</div>
+
+<!-- Station4 -->
+<div class="Bottom-burr-cam">
+  <h5>Station 4</h5>
+  <div>
+    <label>Bottom Burr</label>
+    <input type="text" id="Bottom-Burr">
+  </div>
+</div>
+                        </div>
+
+                    </div>
+
+                    <div hidden
+                     class="row-5">
+
+                        <h3>Dimension</h3>
+
+
+                        <div class="Dimension-container">
+
+                            <h5>Inner Ø</h5>
+                            <input type="text" name="Inner-Ø" id="Inner-Ø">
+
+                            <h5>Outer Ø</h5>
+                            <input type="text" name="Outer-Ø" id="Outer-Ø">
+
+                            <h5>Orifice Ø</h5>
+                            <input type="text" name="Orifice-Ø" id="Orifice-Ø">
+
+                           
+                                 <h5>Concentricity Ø</h5>
+                            <input type="text" name="Concentricity-Ø" id="Concentricity-Ø">
+
+                           
+                        </div>
+                    </div>
+
+                </div>
+
+
+
+
+            </div>
+
+            <div class="right-section">
+                <div class="row-1-right-sec">
+                    <!-- <h3>Defects</h3>
+
+                    <div class="defect-circles">
+
+                        <div class="Dimension-cam">
+                            <h5>Dimension Camera</h5>
+
+                            {% for defect in defects_data %}
+                            <div class="defect-item">
+                                <div class="defect-label">{{ defect.defects }} :</div>
+                                <div class="defect-circle"></div>
+
+                            </div>
+                            {% endfor %}
+
+                        </div>
+
+                        <div class="Thickness-cam">
+                            <h5>Thickness Camera</h5>
+
+                            {% for defect in defects_data %}
+                            <div class="defect-item">
+                                <div class="defect-label">{{ defect.defects }} :</div>
+                                <div class="defect-circle"></div>
+
+                            </div>
+                            {% endfor %}
+
+                        </div>
+
+                        <div class="Top-burr-cam">
+                            <h5>Top Burr Camera</h5>
+
+                            {% for defect in defects_data %}
+                            <div class="defect-item">
+                                <div class="defect-label">{{ defect.defects }} :</div>
+                                <div class="defect-circle"></div>
+
+                            </div>
+                            {% endfor %}
+
+                        </div>
+
+                        <div class="Bottom-burr-cam">
+                            <h5>Bottom Burr Camera</h5>
+
+                            {% for defect in defects_data %}
+                            <div class="defect-item">
+                                <div class="defect-label">{{ defect.defects }} :</div>
+                                <div class="defect-circle"></div>
+
+                            </div>
+                            {% endfor %}
+
+                        </div>
+
+                    </div> -->
+
+                    <h1>PERCEPTA INNOVATIONS</h1>
+
+                </div>
+
+                <div class="row-2-right-sec">
+
+                    <!-- <div class="Result">
+
+                        <h3>Result</h3>
+
+                        <div class="cam-result">
+
+                            <h5>Dimension Camera</h5>
+                            <div class="camera-result-circle-1"></div>
+
+                            <h5>Thickness Camera</h5>
+                            <div class="camera-result-circle-2"></div>
+
+                            <h5>Top Burr Camera</h5>
+                            <div class="camera-result-circle-3"></div>
+
+                            <h5>Bottom Burr Camera</h5>
+                            <div class="camera-result-circle-4"></div>
+
+                        </div>
+
+                    </div> -->
+
+                    <div class="row-2-right-sec">
+
+                        <div class="work-part-detail-table">
+                            <h3>Work Part Detail Table</h3>
+                            <div class="scroll-table-wrapper">
+                                <table class="styled-table">
+                                    <thead>
+                                        <tr>
+                                            <th>S_No</th>
+                                            <th>Date_time</th>
+                                            <th>Part_Name</th>
+                                            <th>Subpart_Name</th>
+                                            <th>Part_ID</th>
+                                            <th>Current_Station</th>
+                                            <th>ID</th>
+                                            <th>OD</th>
+                                            <th>Orifice</th>
+                                            <th>Concentricity</th>
+                                            <th>Dimension_Cam_Image</th>
+                                            <th>Dimension_Result</th>
+                                            <th>Dimension_Cam_Error_Description</th>
+                                            <th>Thickness_Cam_Image</th>
+                                            <th>Thickness_Result</th>
+                                            <th>Thickness_Cam_Error_Description</th>
+                                            <th>TopBurr_Cam_Image</th>
+                                            <th>TopBurr_Result</th>
+                                            <th>TopBurr_Cam_Error_Description</th>
+                                            <th>Bottom_Cam_Image</th>
+                                            <th>Bottom_Result</th>
+                                            <th>Bottom_Cam_Error_Description</th>
+                                            <th>Supplier_Name</th>
+                                            <th>Invoice_No</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in work_part_details %}
+                                        <tr>
+                                            <td>{{ row.S_No }}</td>
+                                            <td>{{ row.Date_time }}</td>
+                                            <td>{{ row.Part_Name }}</td>
+                                            <td>{{ row.Subpart_Name }}</td>
+                                            <td>{{ row.Part_ID }}</td>
+                                            <td>{{ row.Current_Station }}</td>
+                                            <td>{{ row.ID }}</td>
+                                            <td>{{ row.OD }}</td>
+                                            <td>{{ row.Orifice }}</td>
+                                            <td>{{ row.Concentricity }}</td>
+                                            <td>{{ row.Dimension_Cam_Image }}</td>
+                                            <td>{{ row.Dimension_Result }}</td>
+                                            <td>{{ row.Dimension_Cam_Error_Description }}</td>
+                                            <td>{{ row.Thickness_Cam_Image }}</td>
+                                            <td>{{ row.Thickness_Result }}</td>
+                                            <td>{{ row.Thickness_Cam_Error_Description }}</td>
+                                            <td>{{ row.TopBurr_Cam_Image }}</td>
+                                            <td>{{ row.TopBurr_Result }}</td>
+                                            <td>{{ row.TopBurr_Cam_Error_Description }}</td>
+                                            <td>{{ row.Bottom_Cam_Image }}</td>
+                                            <td>{{ row.Bottom_Result }}</td>
+                                            <td>{{ row.Bottom_Cam_Error_Description }}</td>
+                                            <td>{{ row.Supplier_Name }}</td>
+                                            <td>{{ row.Invoice_No }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                </div>
+
+                <div class="row-3-right-sec">
+
+                    <div class="WorkPartDetailTable">
+
+
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<div class="controls">
+    <button class="control-btn" onclick="toggleSlide()" id="controller-toggleBtn">&#10095;</button>
+</div>
+
+
+<script>
+  // Connect to backend event stream
+  const evtSource = new EventSource("/result_stream");
+
+  // Store counts per camera
+  const counters = {
+    cam1: {ok: 0, nok: 0, total: 0},
+    cam2: {ok: 0, nok: 0, total: 0},
+    cam3: {ok: 0, nok: 0, total: 0},
+    cam4: {ok: 0, nok: 0, total: 0}
+  };
+
+
+evtSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);  
+    const camId = data.cam_id;
+    const result = data.result;
+
+    // ✅ Update latest result
+    document.getElementById(camId + "-result").textContent = result;
+
+    // ✅ Update counters
+    counters[camId].total++;
+    if (result === "OK") counters[camId].ok++;
+    else counters[camId].nok++;
+
+    document.getElementById(camId + "-ok").textContent = counters[camId].ok;
+    document.getElementById(camId + "-nok").textContent = counters[camId].nok;
+    document.getElementById(camId + "-total").textContent = counters[camId].total;
+
+    // ✅ Update station-specific fields
+  if (camId === "cam1") {
+    if (data.defects) {
+        if (data.defects.flash_id !== undefined) {
+            document.getElementById("Flash-on-ID").value = data.defects.flash_id;
+        }
+        if (data.defects.flash_od !== undefined) {
+            document.getElementById("Flash-on-OD").value = data.defects.flash_od;
+        }
+    }
+
+    if (data.dimensions) {
+        if (data.dimensions.id !== undefined) {
+            document.getElementById("station1-id").value = data.dimensions.id;
+            document.getElementById("Inner-Ø").value = data.dimensions.id; // also mirror in Dimension section
+        }
+        if (data.dimensions.od !== undefined) {
+            document.getElementById("station1-od").value = data.dimensions.od;
+            document.getElementById("Outer-Ø").value = data.dimensions.od;
+        }
+        if (data.dimensions.orifice !== undefined) {
+            document.getElementById("Orifice").value = data.dimensions.orifice;
+            document.getElementById("Orifice-Ø").value = data.dimensions.orifice;
+        }
+        if (data.dimensions.Concentricity !== undefined) {
+            document.getElementById("Concentricity").value = data.dimensions.Concentricity;
+            document.getElementById("Concentricity-Ø").value = data.dimensions.Concentricity;
+        }
+       
+    }
+}
+
+    
+    
+    
+    else if (camId === "cam2") {
+    console.log("=== Cam2 incoming data ===", data);
+
+    // Debug Vertical Flash
+    if (data.defects && data.defects.vertical_flash !== undefined) {
+        const vfField = document.getElementById("VerticalFlash");
+        console.log("VerticalFlash field:", vfField);
+        if (vfField) {
+            vfField.value = data.defects.vertical_flash;
+        } else {
+            console.warn("⚠️ VerticalFlash input not found in DOM");
+        }
+    }
+
+    // Debug Dimensions
+    if (data.dimensions) {
+        console.log("Cam2 dimensions:", data.dimensions);
+
+        // Thickness
+        const thField = document.getElementById("Thickness");
+        console.log("Thickness field:", thField);
+        if (thField) {
+            thField.value = data.dimensions.thickness ?? "NO VALUE";
+        } else {
+            console.warn("⚠️ Thickness input not found in DOM");
+        }
+
+        // Orifice
+        const orField = document.getElementById("Orifice");
+        console.log("Orifice field:", orField);
+        if (orField) {
+            orField.value = data.dimensions.orifice ?? "NO VALUE";
+        } else {
+            console.warn("⚠️ Orifice input not found in DOM");
+        }
+    }
+    } 
+
+    else if (camId === "cam3") {
+        if (data.defects && data.defects.top_burr !== undefined) {
+            document.getElementById("Top-Burr").value = data.defects.top_burr;
+        }
+    }
+    else if (camId === "cam4") {
+        if (data.defects && data.defects.bottom_burr !== undefined) {
+            document.getElementById("Bottom-Burr").value = data.defects.bottom_burr;
+        }
+    }
+};
+
+
+
+function fetchSubpartsForHome() {
+    const selectedPart = document.getElementById('selectpart').value;
+    const subpartSelect = document.getElementById('selectsubpart');
+    
+    // Clear existing subpart options
+    subpartSelect.innerHTML = '<option value="">Select Subpart</option>';
+    
+    if (selectedPart) {
+        fetch('/get_subparts_home', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({part: selectedPart})
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Populate subpart dropdown with filtered results
+            data.subparts.forEach(subpart => {
+                const option = document.createElement('option');
+                option.value = subpart;
+                option.textContent = subpart;
+                subpartSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching subparts:', error);
+        });
+    }
+}
+
+    function sendSpecial(action) {
+        if (action === 'start') {
+            fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    part: 'DefaultPart',
+                    subpart: 'DefaultSubPart'
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("🟢 Start process:", data.status);
+                })
+                .catch(error => console.error("🚨 Start process failed:", error));
+        }
+        else if (action === 'stop') {
+            fetch('/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log("🔴 Stop process:", data.status);
+                })
+                .catch(error => console.error("🚨 Stop process failed:", error));
+        }
+    }
+
+    function updateCameraStatus(cameraId, isConnected) {
+        const circle = document.getElementById(`${cameraId}-status`);
+        if (circle) {
+            circle.style.backgroundColor = isConnected ? "green" : "red";
+        }
+    }
+
+
+
+    function fetchCameraStatus() {
+        fetch('/camera-status')
+            .then(response => response.json())
+            .then(data => {
+                updateCameraStatus('cam1', data.cam1);
+                updateCameraStatus('cam2', data.cam2);
+                updateCameraStatus('cam3', data.cam3);
+                updateCameraStatus('cam4', data.cam4);
+            });
+    }
+
+    // Optionally: poll every 5 seconds or call this manually after $ACK_STR# or C1-C4
+    setInterval(fetchCameraStatus, 5000);
+
+
+
+    // const eventSource = new EventSource('/stream');
+
+    // eventSource.onmessage = function (event) {
+    // if (event.data === "show_image") {
+    // const img = document.getElementById("triggerImage");
+    // img.src = `/static/image.bmp?v=${Date.now()}`; // Force reload
+    // img.style.display = 'block';
+    // console.log("🖼️ Image displayed due to C1");
+    // }
+    // };
+
+
+
+    const eventSource = new EventSource('/stream');
+
+    eventSource.onmessage = function (event) {
+        const camId = event.data.trim(); // Example: "cam1"
+
+        const imgElement = document.querySelector(`#${camId} img`);
+        if (imgElement) {
+            imgElement.src = `/static/OutputImages/${camId}output/${camId}_bmp.bmp?v=${Date.now()}`;
+            imgElement.style.display = 'block';
+            console.log(`🖼️ Displaying black & white image for ${camId}`);
+        }
+    };
+
+
+
+    // Fixed toggleSlide function
+    function toggleSlide() {
+        currentIndex = currentIndex === 0 ? 1 : 0; // Toggle between 0 and 1
+        slider.style.transform = `translateX(-${positions[currentIndex]}vw)`;
+        console.log("Toggle btn clicked, currentIndex:", currentIndex); // Debugging
+
+        // Change button symbol based on current slide
+        toggleBtn.innerHTML = currentIndex === 0 ? "&#10095;" : "&#10094;";
+    }
+
+    // Make sure elements are properly initialized
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize slider and button elements
+        const slider = document.getElementById("slider");
+        const toggleBtn = document.getElementById("controller-toggleBtn");
+
+        // Left and right positions (these values appear correct in your original code)
+        const positions = [0, 56.66];
+
+        // Initialize currentIndex
+        let currentIndex = 0;
+
+        // Add event listener to button
+        toggleBtn.addEventListener("click", function () {
+            currentIndex = currentIndex === 0 ? 1 : 0; // Toggle between 0 and 1
+            slider.style.transform = `translateX(-${positions[currentIndex]}vw)`;
+            console.log("Toggle btn clicked, currentIndex:", currentIndex);
+
+            // Change button symbol based on current slide
+            toggleBtn.innerHTML = currentIndex === 0 ? "&#10095;" : "&#10094;";
+        });
+    });
+
+
+    function sendCommand(cmdNum) {
+        fetch(`/send/${cmdNum}`, { method: 'POST' })
+            .then(res => res.text())
+            .then(data => {
+                document.getElementById('output').innerText = data;
+            })
+            .catch(err => {
+                document.getElementById('output').innerText = "Error: " + err;
+            });
+    }
+
+    function sendSpecial(action) {
+        const part = document.getElementById('selectpart').value;
+        const subpart = document.getElementById('selectsubpart').value;
+
+        if (!part || !subpart) {
+            alert("Please select both part and subpart.");
+            return;
+        }
+
+        fetch(`/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                part: part,
+                subpart: subpart
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Response:", data);
+                // Optional: show success or failure message
+            })
+            .catch(error => console.error("Error:", error));
+    }
+
+
+
+
+
+    function fetchParameters() {
+        var part = document.getElementById('selectpart').value;
+        var subpart = document.getElementById('selectsubpart').value;
+
+        if (part && subpart) {
+            fetch('/get_station_parameters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ part: part, subpart: subpart })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    populateStationInputs(data);
+                });
+        }
+    }
+
+
+
+
+
+
+</script>
+
+{% endblock body %}

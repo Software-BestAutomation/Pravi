@@ -1,0 +1,201 @@
+{% extends 'Base.html' %} {% block body %}
+<style>
+  html {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --cams-width: 70%;
+  }
+
+  .main-pg {
+    display: flex;
+  }
+
+  .cams-container {
+    width: var(--cams-width);
+    margin-right: auto;
+    /* Pushes the container to the left, leaving space on the right */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 15px;
+  }
+
+  .cam {
+    padding: 20px;
+    box-shadow: 0 3px 9px -3px black;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+  }
+
+
+  .img {
+    width: 30rem;
+    height: 15rem;
+    border: 2px dashed gray;
+  }
+
+  .heading {
+    border-bottom: 1px solid black;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  h3 {
+    font-family: 'Play', cursive;
+  }
+
+
+  .camera-status-circle {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: red;
+    border-radius: 50%;
+  }
+
+  .defect-section {
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .defect-circle {
+    width: 4rem;
+    height: 4rem;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 50px #ccc;
+  }
+
+  .label-inputs {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+  }
+
+  .main-pg {
+    display: flex;
+  }
+
+  .col-1 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 15px;
+  }
+
+  label {
+    font-weight: 700;
+    font-family: 'Play', sans-serif;
+    font-size: 1rem;
+    /* Adjust size if needed */
+  }
+
+  div#cam4 {
+    padding: 5px;
+    box-shadow: 0 3px 9px -3px black;
+    border-radius: 5px;
+  }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap" rel="stylesheet">
+
+
+<div class="main-pg">
+  <div class="cams-container">
+
+    <div class="cam" id="cam1">
+      <div class="heading">
+        <h3>Camera-1</h3>
+        <div class="camera-status-circle"></div>
+      </div>
+      <div class="img"></div>
+      <div class="defect-section">
+        <div class="defect-circle"></div>
+        <div class="label-inputs">
+          <div>
+            <label>Defect 1</label>
+            <input type="text" />
+          </div>
+          <div>
+            <label>Defect 2</label>
+            <input type="text" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cam" id="cam2">
+      <div class="heading">
+        <h3>Camera-2</h3>
+        <div class="camera-status-circle"></div>
+      </div>
+      <div class="img"></div>
+      <div class="defect-section">
+        <div class="defect-circle"></div>
+        <div class="label-inputs">
+          <div>
+            <label>Defect 1</label>
+            <input type="text" />
+          </div>
+          <div>
+            <label>Defect 2</label>
+            <input type="text" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cam" id="cam3">
+      <div class="heading">
+        <h3>Camera-3</h3>
+        <div class="camera-status-circle"></div>
+      </div>
+      <div class="img"></div>
+      <div class="defect-section">
+        <div class="defect-circle"></div>
+        <div class="label-inputs">
+          <div>
+            <label>Defect 1</label>
+            <input type="text" />
+          </div>
+          <div>
+            <label>Defect 2</label>
+            <input type="text" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cam" id="cam4">
+      <div class="heading">
+        <h3>Camera-4</h3>
+        <div class="camera-status-circle"></div>
+      </div>
+      <div class="img"></div>
+      <div class="defect-section">
+        <div class="defect-circle"></div>
+        <div class="label-inputs">
+          <div>
+            <label>Defect 1</label>
+            <input type="text" />
+          </div>
+          <div>
+            <label>Defect 2</label>
+            <input type="text" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+
+  </div>
+</div>
+
+{% endblock body %}

@@ -1,0 +1,887 @@
+{% extends 'Base.html' %} {% block body %}
+
+
+
+
+<!-- <script>
+  /* Existing JavaScript functions here */
+  function validateInput(event) {
+    const input = event.target;
+    let value = input.value;
+
+    // Convert to uppercase
+    value = value.toUpperCase();
+
+    // Remove special characters
+    value = value.replace(/[^A-Z0-9]/g, "");
+
+    // Update the input value
+    input.value = value;
+  }
+
+  document.querySelector('#defects-form').addEventListener('submit', function (e) {
+    const partName = document.getElementById('cboPartNameDefect').value.trim();
+    const station = document.getElementById('cboViewDefect').value.trim();
+    const defectName = document.getElementById('defect-name').value.trim();
+
+    if (!partName || station === "Select" || !defectName) {
+      alert('Please fill in all fields: Part Name, Station, and Defect Name.');
+      e.preventDefault(); // Prevent form submission
+    }
+  });
+
+
+
+  function btnSubmitPartsClick() {
+    const isAddingNewPart = document.getElementById("part-name").style.display === "block";
+    const partInput = document.getElementById("part-name").value;
+    const partDropdown = document.getElementById("cboPartName").value;
+
+    // Set the hidden input to the appropriate value
+    document.getElementById("selected-part-name").value = isAddingNewPart ? partInput : partDropdown;
+
+    // Allow the form to be submitted (confirmation dialog handles submission)
+    return true;
+  }
+
+  function ValidateNumber(event) {
+    var input = event.target;
+    var value = input.value;
+
+    value = value.replace(/[^0-9]/g, "");
+
+    input.value = value;
+  }
+
+  async function selectFolder() {
+    try {
+      // Open a directory picker
+      const dirHandle = await window.showDirectoryPicker();
+
+      // Get the selected folder's path
+      const path = dirHandle.name;
+
+      // Update the input field with the folder path
+      document.getElementById("master-local-path").value = path;
+    } catch (err) {
+      console.error("Error selecting folder:", err);
+    }
+  }
+
+  let form;
+
+  function showConfirmationDialog(event) {
+    // Prevent the form from submitting immediately
+    event.preventDefault();
+
+    // Show the custom confirmation dialog
+    document.getElementById("confirmation-dialog").style.display = "block";
+
+    // Store the form reference for later submission
+    form = event.target;
+
+    return false; // Prevent default form submission
+  }
+
+  function confirmSubmit(isConfirmed) {
+    // Hide the custom confirmation dialog
+    document.getElementById("confirmation-dialog").style.display = "none";
+
+    if (isConfirmed) {
+      // If the user confirms, submit the form
+      form.submit();
+    }
+  }
+  // Set the default value of selected-part-name when the page loads
+  window.onload = function () {
+    document.getElementById("selected-part-name").value =
+      document.getElementById("cboPartName").value;
+  };
+
+  var addnewsubpart = false;
+
+  function addpartClick() {
+    document.getElementById("part-name").style.display = "block";
+    document.getElementById("back-button").style.display = "block";
+    document.getElementById("add-part-button").style.display = "none";
+    document.getElementById("cboPartName").style.display = "none";
+
+    addnewsubpart = true;
+  }
+
+  function backClick() {
+    document.getElementById("part-name").style.display = "none";
+    document.getElementById("back-button").style.display = "none";
+    document.getElementById("add-part-button").style.display = "block";
+    document.getElementById("cboPartName").style.display = "block";
+
+    addnewsubpart = false;
+  }
+
+  function btnSubmitPartsClick() {
+    if (addnewsubpart === true) {
+      document.getElementById("selected-part-name").value =
+        document.getElementById("part-name").value;
+    }
+    if (addnewsubpart === false) {
+      document.getElementById("selected-part-name").value =
+        document.getElementById("cboPartName").value;
+    }
+  }
+
+  let selectedRowData = {};
+  let isEditMode = false;
+  function selectOnlyOneDefectRow(checkbox) {
+    const checkboxes = document.getElementsByName("select-defect-row");
+    checkboxes.forEach((cb) => {
+      if (cb !== checkbox) {
+        cb.checked = false;
+      }
+    });
+
+    if (checkbox.checked) {
+      const row = checkbox.closest("tr");
+      selectedRowData = {
+        partName: row.cells[1].textContent,
+        view: row.cells[2].textContent,
+        defectName: row.cells[3].textContent,
+      };
+
+      document.getElementById("selected-defect-part-name-in-table").value =
+        selectedRowData.partName;
+      document.getElementById("selected-defectview-name-in-table").value =
+        selectedRowData.view;
+      document.getElementById("selected-defect-name-in-table").value =
+        selectedRowData.defectName;
+    } else {
+      selectedRowData = {};
+    }
+
+    console.log(selectedRowData); // For demonstration purposes
+  }
+
+  function btnEditDefectClick() {
+    if (
+      document.getElementById("selected-defect-part-name-in-table").value === ""
+    ) {
+      alert("Please select a row to edit the defect!");
+    } else {
+      isEditMode = true;
+      document.getElementById("defects-form").action = "/UpdateDefectSettings";
+      document.getElementById("cboPartNameDefect").value =
+        document.getElementById("selected-defect-part-name-in-table").value;
+      document.getElementById("cboViewDefect").value = document.getElementById(
+        "selected-defectview-name-in-table"
+      ).value;
+      document.getElementById("defect-name").value = document.getElementById(
+        "selected-defect-name-in-table"
+      ).value;
+      document.querySelector(".save-button").innerText = "Update";
+    }
+  }
+
+  function btnNewDefectClick() {
+    isEditMode = false;
+    const form = document.getElementById("defects-form");
+
+    // document.getElementById("cboPartNameDefect").value = "";
+    // document.getElementById("cboViewDefect").value = "";
+    document.getElementById("defect-name").value = "";
+    document.querySelector(".save-button").innerText = "Save";
+
+    // if (form) {
+    //   form.action = "/DefectSettings";
+    //   console.log(`Form action set to: ${form.action}`);
+    // } else {
+    //   console.log("Form not found");
+    // }
+
+    // Uncheck selected rows
+    const checkboxes = document.getElementsByName("select-defect-row");
+    checkboxes.forEach((cb) => {
+      cb.checked = false;
+    });
+    selectedRowData = {};
+  }
+
+  function btnEditPartsClick() {
+    if (document.getElementById("selected-part-name-in-table").value === "") {
+      alert("Please select a row to edit the part!");
+    } else {
+      document.getElementById("part-name").style.display = "block";
+      document.getElementById("back-button").style.display = "block";
+      document.getElementById("add-part-button").style.display = "none";
+      document.getElementById("cboPartName").style.display = "none";
+
+      document.getElementById("part-name").value = document.getElementById(
+        "selected-part-name-in-table"
+      ).value;
+      document.getElementById("subpart-name").value = document.getElementById(
+        "selected-subpart-name-in-table"
+      ).value;
+    }
+  }
+  let SelectedPartRowData = {};
+
+  function selectOnlyOnePartRow(checkbox) {
+    const checkboxes = document.getElementsByName("select-part-row");
+    checkboxes.forEach((cb) => {
+      if (cb !== checkbox) {
+        cb.checked = false;
+      }
+    });
+
+    if (checkbox.checked) {
+      const row = checkbox.closest("tr");
+      SelectedPartRowData = {
+        partName: row.cells[1].textContent,
+        subpartName: row.cells[2].textContent,
+      };
+      document.getElementById("selected-part-name-in-table").value =
+        SelectedPartRowData.partName;
+      document.getElementById("selected-subpart-name-in-table").value =
+        SelectedPartRowData.subpartName;
+    } else {
+      SelectedPartRowData = {};
+    }
+
+    console.log(SelectedPartRowData);
+  }
+
+
+  // Select elements
+  const menuIcon = document.getElementById("menuIcon");
+  const navLinks = document.getElementById("navLinks");
+
+  // Toggle menu on click
+  menuIcon.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+
+
+  setTimeout(() => {
+    document.querySelectorAll('.flash').forEach(msg => {
+      msg.style.display = 'none';
+    });
+  }, 3000);
+
+
+
+
+
+</script> -->
+
+
+<script>
+
+    function validateInput(event) {
+        const input = event.target;
+        let value = input.value;
+
+        // Convert to uppercase
+        value = value.toUpperCase();
+
+        // Remove special characters
+        value = value.replace(/[^A-Z0-9]/g, "");
+
+        // Update the input value
+        input.value = value;
+      }
+
+  let editRow = null;
+
+  function addPart() {
+    const part = document.getElementById("part-input").value.trim();
+    const subpart = document.getElementById("subpart-input").value.trim();
+
+    if (!part || !subpart) {
+      alert("Please enter both Part and SubPart.");
+      return;
+    }
+
+    fetch("/add_part", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part, subpart })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const table = document.getElementById("part-table").querySelector("tbody");
+          const row = table.insertRow();
+          row.dataset.recipeId = data.recipe_id;
+
+          row.insertCell(0).innerText = data.part;
+          row.insertCell(1).innerText = data.subpart;
+          row.insertCell(2).innerHTML = `
+        <button onclick="editPart(this)">Edit</button>
+        <button onclick="deletePart(this)">Delete</button>
+      `;
+        }
+      });
+
+    document.getElementById("part-input").value = "";
+    document.getElementById("subpart-input").value = "";
+  }
+
+  function deletePart(button) {
+    const row = button.parentElement.parentElement;
+    const recipe_id = row.dataset.recipeId;
+
+    fetch("/delete_part", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          row.remove();
+        }
+      });
+  }
+
+  function editPart(button) {
+    editRow = button.parentElement.parentElement;
+    document.getElementById("part-input").value = editRow.cells[0].innerText;
+    document.getElementById("subpart-input").value = editRow.cells[1].innerText;
+    document.getElementById("save-btn").disabled = false;
+  }
+
+  function saveEdit() {
+    if (!editRow) return;
+
+    const recipe_id = editRow.dataset.recipeId;
+    const part = document.getElementById("part-input").value.trim();
+    const subpart = document.getElementById("subpart-input").value.trim();
+
+    fetch("/update_part", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipe_id, part, subpart })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          editRow.cells[0].innerText = part;
+          editRow.cells[1].innerText = subpart;
+        }
+      });
+
+    document.getElementById("save-btn").disabled = true;
+    document.getElementById("part-input").value = "";
+    document.getElementById("subpart-input").value = "";
+    editRow = null;
+  }
+
+    // INSERT INTO[Pravi_DB].[dbo].[Python_parameters]
+    //     ([RecipeID], [Station], [Parameter], [Value])
+    //   VALUES
+    //     ('P1S1', 'S3', 'min_id_area3', '50'),
+    //     ('P1S1', 'S3', 'max_id_area3', '80'),
+    //     ('P1S1', 'S3', 'min_od_area3', '20'),
+    //     ('P1S1', 'S3', 'max_od_area3', '20');
+</script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<style>
+
+
+
+ #part-settings .input-group {
+      margin-bottom: 10px;
+  }
+
+    #part-settings input {
+      padding: 5px;
+    margin-right: 5px;
+  }
+
+    #part-settings button {
+      margin-right: 5px;
+    padding: 5px 10px;
+  }
+
+    #part-settings table {
+      width: 100%;
+    border-collapse: collapse;
+  }
+
+    #part-settings th {
+      background: #f2f2f2;
+  }
+
+    #part-settings td,
+    #part-settings th {
+      text-align: center;
+  }
+
+.page-container {
+  height: 100vh;
+  width: 100vw;
+  padding: 15px;
+  box-sizing: border-box;
+}
+
+.page-container .flex {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+  height: 100%;
+  align-items: stretch;
+}
+
+
+  /* General Page Styling */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #f8f9fa;
+  color: #333;
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling */
+}
+
+.container {
+  max-width: 100% ;
+  padding: 0 ;
+  margin-top: 5rem;
+}
+
+
+
+.container .flex {
+  display: grid;
+  grid-template-columns: 30% 70%; /* Primary (30%) + Part/Defect (70%) */
+  gap: 15px;
+  height: 100%;
+}
+
+
+
+
+
+
+
+
+
+.section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  height: 160%;   /* force each section to fill its grid cell */
+  overflow: hidden;
+}
+
+
+
+
+.section .header {
+  background: #1d3557;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.section .content,
+.section .content1 {
+  flex: 1;
+  overflow: auto; /* Only inner scroll if absolutely necessary */
+  padding: 5px;
+}
+
+/* Input groups */
+.input-group, .partSubpart, .defParts, .Station, .def {
+  margin-bottom: 12px;
+}
+
+.input-group h6,
+.input-group label {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #1d3557;
+}
+
+.input-group input,
+.select,
+select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Buttons */
+button {
+  background: #1d3557;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+button:hover {
+  background: #16324c;
+}
+
+.save-button {
+  margin: 4px;
+}
+
+/* Table */
+.table-container {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table-container th,
+.table-container td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  text-align: center;
+}
+
+.table-header {
+  background: #1d3557;
+  color: white;
+  padding: 6px;
+  font-weight: bold;
+  border-radius: 8px 8px 0 0;
+}
+
+/* Alerts */
+.AlertMsg {
+  margin-top: 8px;
+}
+
+.flash {
+  padding: 6px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.flash.success { background: #d4edda; color: #155724; }
+.flash.error { background: #f8d7da; color: #721c24; }
+
+/* Folder Icon */
+.folder-icon {
+  cursor: pointer;
+  font-size: 18px;
+  margin-left: 6px;
+}
+
+/* Confirmation Dialog */
+#confirmation-dialog {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0px 6px 20px rgba(0,0,0,0.3);
+  z-index: 1000;
+  text-align: center;
+}
+
+#confirmation-dialog button {
+  margin: 8px;
+}
+
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #ddd;
+  margin-bottom: 10px;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 10px;
+  background: #f1f1f1;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background 0.2s;
+  border-radius: 6px 6px 0 0;
+}
+
+.tab-button.active {
+  background: #1d3557;
+  color: white;
+}
+
+.tab-content {
+  display: none;
+  height: 100%;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+
+
+
+.responsive-table-container {
+  height: 50vh; /* 50% of viewport height */
+  overflow-y: auto;
+  border: 2px solid #333;
+  border-radius: 5px;
+}
+
+#part-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+#part-table thead th {
+  position: sticky;
+  top: 0;
+  background: #1d3557;
+  color: white;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: bold;
+}
+
+#part-table tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+#part-table tbody tr:hover {
+  background-color: #f5f5f5;
+}
+</style>
+
+
+
+
+
+
+<div class="page-container" id="container">
+  <div class="container" id="container">
+    <div class="flex">
+
+      <!-- Primary Settings Section (30%) -->
+      <div class="section primary-settings">
+        <div class="header">Primary Settings</div>
+        <div class="content">
+          <!-- Your existing Primary Settings form (unchanged) -->
+          <form method="POST" action="/PrimarySettings">
+            <div class="input-group">
+              <h6>Camera 1 Serial No:</h6>
+              <input type="text" id="camera-1-serial-no" name="camera-1-serial-no" value="{{ Camera1SerialNo }}"
+                oninput="validateInput(event)" />
+            </div>
+            <div class="input-group">
+              <h6>Camera 2 Serial No:</h6>
+              <input type="text" id="camera-2-serial-no" name="camera-2-serial-no" value="{{ Camera2SerialNo }}"
+                oninput="validateInput(event)" />
+            </div>
+            <div class="input-group">
+              <h6>Camera 3 Serial No:</h6>
+              <input type="text" id="camera-3-serial-no" name="camera-3-serial-no" value="{{ Camera3SerialNo }}"
+                oninput="validateInput(event)" />
+            </div>
+            <div class="input-group">
+              <h6>Camera 4 Serial No:</h6>
+              <input type="text" id="camera-4-serial-no" name="camera-4-serial-no" value="{{ Camera4SerialNo }}"
+                oninput="validateInput(event)" />
+            </div>
+            <div class="input-group">
+              <h6>IP-Address:</h6>
+              <input type="text" id="port-name" name="port-name" oninput="validateInput(event)"
+                value="{{ port_name }}" />
+            </div>
+            <div class="input-group">
+              <h6>Baud Rate:</h6>
+              <input type="text" id="baud-rate" name="baud-rate" oninput="ValidateNumber(event)"
+                value="{{ baud_rate }}" />
+            </div>
+            <div class="input-group">
+              <h6>Master Local Path:</h6>
+              <input type="text" id="master-local-path" name="master-local-path" readonly
+                value="{{ master_local_path }}" />
+              <span class="folder-icon" onclick="selectFolder()">📁</span>
+            </div>
+            <div class="footer">
+              <button class="save-button" type="submit">Save</button>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="AlertMsg">
+              {% for category, message in messages %}
+              {% if not category.startswith('part-') and not category.startswith('defect-') %}
+              <div class="flash {{ category }}">{{ message }}</div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+          </form>
+        </div>
+      </div>
+
+      <!-- Part & Defect Settings Section (70%) -->
+<!-- Part & Defect Settings Section (70%) -->
+<div class="section part-defect-settings">
+  <div class="header">Part & Defect Settings</div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-button active" onclick="openTab(event, 'part-settings')">Part Settings</button>
+    <button class="tab-button" onclick="openTab(event, 'defect-settings')">Defect Settings</button>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="content">
+  <div id="part-settings" class="tab-content active">
+    <h4>Part Settings</h4>
+  
+    <!-- Input section -->
+    <div class="input-group">
+      <input type="text" id="part-input" placeholder="Enter Part">
+      <input type="text" id="subpart-input" placeholder="Enter SubPart">
+      <button onclick="addPart()">Add</button>
+      <button onclick="saveEdit()" id="save-btn" disabled>Save</button>
+    </div>
+  
+    <!-- Table -->
+<div class="responsive-table-container">
+  <table id="part-table" border="1" cellpadding="8" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Part</th>
+        <th>SubPart</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr data-recipe-id="{{ row.Recipe_id }}">
+        <td>{{ row.Part_name }}</td>
+        <td>{{ row.Subpart_name }}</td>
+        <td>
+          <button onclick="editPart(this)">Edit</button>
+          <button onclick="deletePart(this)">Delete</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+  
+  
+  </div>
+
+    
+
+  <div id="defect-settings" class="tab-content">
+    <h4>Defect Settings</h4>
+  
+    <!-- Input section -->
+    <div class="input-group">
+      <select id="part-combobox">
+        {% for part in parts %}
+        <option value="{{ part }}">{{ part }}</option>
+        {% endfor %}
+      </select>
+  
+      <select id="station-combobox">
+        <option value="Station1">Station 1</option>
+        <option value="Station2">Station 2</option>
+        <option value="Station3">Station 3</option>
+        <option value="Station4">Station 4</option>
+      </select>
+  
+      <input type="text" id="defect-input" placeholder="Enter Defect Name">
+  
+      <button onclick="addDefect()">Add</button>
+      <button onclick="saveDefectEdit()" id="save-defect-btn" disabled>Save</button>
+    </div>
+  
+    <!-- Table -->
+    <table id="defect-table" border="1" cellpadding="8" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Part</th>
+          <th>Station</th>
+          <th>Defect Name</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in defect_rows %}
+        <tr data-defect-id="{{ row.id }}">
+          <td>{{ row.Part }}</td>
+          <td>{{ row.View }}</td>
+          <td>{{ row.DefectName }}</td>
+          <td>
+            <button onclick="editDefect(this)">Edit</button>
+            <button onclick="deleteDefect(this)">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  </div>
+</div>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+{% endblock body %}

@@ -1,0 +1,717 @@
+{% extends 'Base.html' %} {% block body %}
+
+<style>
+  /* Existing CSS styles here */
+  .container {
+    padding: 20px;
+    min-height: 90vh;
+    background-color: white;
+    min-width: 100vw;
+    margin: 0;
+  }
+
+  .flex {
+    display: flex;
+    gap: 20px;
+  }
+
+  .section {
+    border: 1px solid #cce1ff;
+    border-radius: 8px;
+    background-color: white;
+    width: 70%;
+  }
+
+  .header {
+    background-color: #0088e3;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  .content {
+    padding: 20px;
+  }
+
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: flex-start;
+  }
+
+  .save-btn,
+  .edit-btn {
+    display: inline;
+  }
+
+  .part-setting-btn {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .input-group label {
+    width: 120px;
+    text-align: right;
+  }
+
+  select#cboPartName {
+    border: 1px solid #ccc;
+    flex-grow: 1;
+    padding: 1px;
+    border-radius: 4px;
+  }
+
+  .input-group input {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    flex-grow: 1;
+  }
+
+  .folder-icon {
+    color: #0088e3;
+    cursor: pointer;
+  }
+
+  .footer {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .parts-settings .table-container {
+    margin-top: 20px;
+  }
+
+  .table-header {
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .add-edit-parts {
+    margin-top: 20px;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .delete-button,
+  .save-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .delete-button {
+    background-color: #f1f1f1;
+    color: gray;
+  }
+
+  .delete-button:hover {
+    background-color: #ddd;
+  }
+
+  .save-button {
+    background-color: #0088e3;
+    color: white;
+  }
+
+  .save-button:hover {
+    background-color: #007acc;
+  }
+
+  .flash-success {
+    color: green;
+    font-weight: bold;
+  }
+
+  .flash-error {
+    color: red;
+    font-weight: bold;
+  }
+
+  /* Additional CSS for Parts Section */
+
+  .table-container {
+    margin-top: 20px;
+  }
+
+  .table-header {
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  #confirmation-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border: 1px solid #ccc;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+  }
+
+  #confirmation-dialog p {
+    margin-bottom: 20px;
+  }
+
+  #confirmation-dialog button {
+    margin: 5px;
+  }
+
+  #add-part {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: green;
+    color: white;
+  }
+
+  #back {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: red;
+    color: white;
+  }
+</style>
+
+<script>
+  /* Existing JavaScript functions here */
+  function validateInput(event) {
+    const input = event.target;
+    let value = input.value;
+
+    // Convert to uppercase
+    value = value.toUpperCase();
+
+    // Remove special characters
+    value = value.replace(/[^A-Z0-9]/g, "");
+
+    // Update the input value
+    input.value = value;
+  }
+
+  function ValidateNumber(event) {
+    var input = event.target;
+    var value = input.value;
+
+    value = value.replace(/[^0-9]/g, "");
+
+    input.value = value;
+  }
+
+  async function selectFolder() {
+    try {
+      // Open a directory picker
+      const dirHandle = await window.showDirectoryPicker();
+
+      // Get the selected folder's path
+      const path = dirHandle.name;
+
+      // Update the input field with the folder path
+      document.getElementById("master-local-path").value = path;
+    } catch (err) {
+      console.error("Error selecting folder:", err);
+    }
+  }
+
+  let form;
+
+  function showConfirmationDialog(event) {
+    // Prevent the form from submitting immediately
+    event.preventDefault();
+
+    // Show the custom confirmation dialog
+    document.getElementById("confirmation-dialog").style.display = "block";
+
+    // Store the form reference for later submission
+    form = event.target;
+
+    return false; // Prevent default form submission
+  }
+
+  function confirmSubmit(isConfirmed) {
+    // Hide the custom confirmation dialog
+    document.getElementById("confirmation-dialog").style.display = "none";
+
+    if (isConfirmed) {
+      // If the user confirms, submit the form
+      form.submit();
+    }
+  }
+  // Set the default value of selected-part-name when the page loads
+  window.onload = function () {
+    document.getElementById("selected-part-name").value =
+      document.getElementById("cboPartName").value;
+  };
+
+  var addnewsubpart = false;
+
+  function addpartClick() {
+    document.getElementById("part-name").style.display = "block";
+    document.getElementById("back-button").style.display = "block";
+    document.getElementById("add-part-button").style.display = "none";
+    document.getElementById("cboPartName").style.display = "none";
+
+    addnewsubpart = true;
+  }
+
+  function backClick() {
+    document.getElementById("part-name").style.display = "none";
+    document.getElementById("back-button").style.display = "none";
+    document.getElementById("add-part-button").style.display = "block";
+    document.getElementById("cboPartName").style.display = "block";
+
+    addnewsubpart = false;
+  }
+
+  function btnSubmitPartsClick() {
+    if (addnewsubpart === true) {
+      document.getElementById("selected-part-name").value =
+        document.getElementById("part-name").value;
+    }
+    if (addnewsubpart === false) {
+      document.getElementById("selected-part-name").value =
+        document.getElementById("cboPartName").value;
+    }
+  }
+
+  let selectedRowData = {};
+  let isEditMode = false;
+
+  function selectOnlyOneDefectRow(checkbox) {
+    const checkboxes = document.getElementsByName("select-defect-row");
+    checkboxes.forEach((cb) => {
+      if (cb !== checkbox) {
+        cb.checked = false;
+      }
+    });
+
+    if (checkbox.checked) {
+      const row = checkbox.closest("tr");
+      selectedRowData = {
+        partName: row.cells[1].textContent,
+        view: row.cells[2].textContent,
+        defectName: row.cells[3].textContent,
+      };
+
+      document.getElementById("selected-defect-part-name-in-table").value =
+        selectedRowData.partName;
+      document.getElementById("selected-defectview-name-in-table").value =
+        selectedRowData.view;
+      document.getElementById("selected-defect-name-in-table").value =
+        selectedRowData.defectName;
+    } else {
+      selectedRowData = {};
+    }
+
+    console.log(selectedRowData); // For demonstration purposes
+  }
+
+  function btnEditDefectClick() {
+    if (
+      document.getElementById("selected-defect-part-name-in-table").value === ""
+    ) {
+      alert("Please select a row to edit the defect!");
+    } else {
+      isEditMode = true;
+      document.getElementById("defects-form").action = "/UpdateDefectSettings";
+      document.getElementById("cboPartNameDefect").value =
+        document.getElementById("selected-defect-part-name-in-table").value;
+      document.getElementById("cboViewDefect").value = document.getElementById(
+        "selected-defectview-name-in-table"
+      ).value;
+      document.getElementById("defect-name").value = document.getElementById(
+        "selected-defect-name-in-table"
+      ).value;
+      document.querySelector(".save-button").innerText = "Update";
+    }
+  }
+
+  function btnNewDefectClick() {
+    isEditMode = false;
+    const form = document.getElementById("defects-form");
+
+    // document.getElementById("cboPartNameDefect").value = "";
+    // document.getElementById("cboViewDefect").value = "";
+    document.getElementById("defect-name").value = "";
+    document.querySelector(".save-button").innerText = "Save";
+
+    // if (form) {
+    //   form.action = "/DefectSettings";
+    //   console.log(`Form action set to: ${form.action}`);
+    // } else {
+    //   console.log("Form not found");
+    // }
+
+    // Uncheck selected rows
+    const checkboxes = document.getElementsByName("select-defect-row");
+    checkboxes.forEach((cb) => {
+      cb.checked = false;
+    });
+    selectedRowData = {};
+  }
+
+  function btnEditPartsClick() {
+    if (document.getElementById("selected-part-name-in-table").value === "") {
+      alert("Please select a row to edit the part!");
+    } else {
+      document.getElementById("part-name").style.display = "block";
+      document.getElementById("back-button").style.display = "block";
+      document.getElementById("add-part-button").style.display = "none";
+      document.getElementById("cboPartName").style.display = "none";
+
+      document.getElementById("part-name").value = document.getElementById(
+        "selected-part-name-in-table"
+      ).value;
+      document.getElementById("subpart-name").value = document.getElementById(
+        "selected-subpart-name-in-table"
+      ).value;
+    }
+  }
+  let SelectedPartRowData = {};
+
+  function selectOnlyOnePartRow(checkbox) {
+    const checkboxes = document.getElementsByName("select-part-row");
+    checkboxes.forEach((cb) => {
+      if (cb !== checkbox) {
+        cb.checked = false;
+      }
+    });
+
+    if (checkbox.checked) {
+      const row = checkbox.closest("tr");
+      SelectedPartRowData = {
+        partName: row.cells[1].textContent,
+        subpartName: row.cells[2].textContent,
+      };
+      document.getElementById("selected-part-name-in-table").value =
+        SelectedPartRowData.partName;
+      document.getElementById("selected-subpart-name-in-table").value =
+        SelectedPartRowData.subpartName;
+    } else {
+      SelectedPartRowData = {};
+    }
+
+    console.log(SelectedPartRowData);
+  }
+</script>
+
+<div class="container">
+  <div class="flex">
+    <!-- Primary Settings Section -->
+    <div class="section primary-settings">
+      <div class="header">Primary Settings</div>
+      <div class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %} {% if
+        messages %} {% for category, message in messages %}
+        <div class="flash-{{ category }}">{{ message }}</div>
+        {% endfor %} {% endif %} {% endwith %}
+        <form method="POST" action="/">
+          <div class="input-group">
+            <label for="port-name">Port Name:</label>
+            <input
+              type="text"
+              id="port-name"
+              name="port-name"
+              oninput="validateInput(event)"
+              value="{{ port_name }}"
+            />
+          </div>
+          <div class="input-group">
+            <label for="baud-rate">Baud Rate:</label>
+            <input
+              type="text"
+              id="baud-rate"
+              name="baud-rate"
+              oninput="ValidateNumber(event)"
+              value="{{ baud_rate }}"
+            />
+          </div>
+          <div class="input-group">
+            <label for="master-local-path">Master Local Path:</label>
+            <input
+              type="text"
+              id="master-local-path"
+              name="master-local-path"
+              readonly
+              value="{{ master_local_path }}"
+            />
+            <span class="folder-icon" onclick="selectFolder()">📁</span>
+          </div>
+          <div class="footer">
+            <button class="save-button" type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Parts Settings Section -->
+    <div class="section parts-settings">
+      <div class="header">Parts Settings</div>
+      <div class="content">
+        <div class="add-edit-parts">
+          <form
+            id="parts-form"
+            method="POST"
+            action="/settings"
+            onsubmit="return showConfirmationDialog(event)"
+          >
+            <div class="input-group">
+              <div class="part-name">
+                <label for="part-name">Part Name:</label>
+                <input
+                  type="text"
+                  id="part-name"
+                  name="part-name"
+                  oninput="validateInput(event)"
+                  style="display: none"
+                />
+              </div>
+
+              <select name="cboPartName" id="cboPartName">
+                {% for part_name in part_names %}
+                <option value="{{ part_name.partname }}">
+                  {{ part_name.partname }}
+                </option>
+                {% endfor %}
+              </select>
+
+              <button
+                class="add-part"
+                id="add-part-button"
+                type="button"
+                onclick="addpartClick()"
+              >
+                +
+              </button>
+              <button
+                class="back"
+                id="back-button"
+                type="button"
+                onclick="backClick()"
+                style="display: none"
+              >
+                x
+              </button>
+            </div>
+
+            <div class="input-defect">
+              <label for="subpart-name">Subpart Name:</label>
+              <input
+                type="text"
+                id="subpart-name"
+                name="subpart-name"
+                oninput="validateInput(event)"
+              />
+            </div>
+
+            <div class="part-setting-btn">
+              <div class="save-btn">
+                <button
+                  class="save-button"
+                  type="submit"
+                  onclick="btnSubmitPartsClick()"
+                >
+                  Save
+                </button>
+              </div>
+
+              <div class="edit-btn">
+                <button
+                  class="save-button"
+                  ,
+                  id="Edit-part-button"
+                  type="button"
+                  onclick="btnEditPartsClick()"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <div class="table-header">Parts</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Select</th>
+                    <th>Part Name</th>
+                    <th>Subpart Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for Parts in PartsInfo %}
+                  <tr>
+                    <td>
+                      <input
+                        type="checkbox"
+                        name="select-part-row"
+                        onclick="selectOnlyOnePartRow(this)"
+                      />
+                    </td>
+                    <td>{{ Parts.partname }}</td>
+                    <td>{{ Parts.subpartname }}</td>
+                  </tr>
+                  {% endfor %}
+                  <!-- More rows can be added dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </form>
+        </div>
+
+        <div class="hiddeninput">
+          <input
+            type="hidden"
+            id="selected-part-name"
+            name="selected-part-name"
+          />
+          <input
+            type="hidden"
+            id="selected-part-name-in-table"
+            name="selected-part-name-in-table"
+          />
+          <input
+            type="hidden"
+            id="selected-subpart-name-in-table"
+            name="selected-subpart-name-in-table"
+          />
+          <input
+            type="hidden"
+            id="selected-defect-part-name-in-table"
+            name="selected-defect-part-name-in-table"
+          />
+          <input
+            type="hidden"
+            id="selected-defectview-name-in-table"
+            name="selected-defectview-name-in-table"
+          />
+          <input
+            type="hidden"
+            id="selected-defect-name-in-table"
+            name="selected-defect-name-in-table"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom confirmation dialog -->
+    <div id="confirmation-dialog" style="display: none">
+      <p>Are you sure you want to save?</p>
+      <button onclick="confirmSubmit(true)">Yes</button>
+      <button onclick="confirmSubmit(false)">No</button>
+    </div>
+
+    <div class="section defects-settings">
+      <div class="header">Defects Settings</div>
+      <div class="content">
+        <div class="add-defects">
+          <form id="defects-form" method="POST" action="/DefectSettings">
+            <div class="input-group">
+              <label for="part-name">Part Name:</label>
+              <select name="cboPartNameDefect" id="cboPartNameDefect">
+                {% for part_name in part_names %}
+                <option value="{{ part_name.partname }}">
+                  {{ part_name.partname }}
+                </option>
+                {% endfor %}
+              </select>
+
+              <label for="View">View:</label>
+              <select name="cboViewDefect" id="cboViewDefect">
+                <option>Top View</option>
+                <option>Bottom View</option>
+              </select>
+
+              <label for="defect-name">Defect Name:</label>
+              <input
+                type="text"
+                id="defect-name"
+                name="defect-name"
+                oninput="validateInput(event)"
+              />
+            </div>
+
+            <div class="footer">
+              <button class="save-button" type="submit">Save</button>
+            </div>
+            <div>
+              <button
+                class="save-button"
+                id="Edit-defect-button"
+                type="button"
+                onclick="btnEditDefectClick()"
+              >
+                Edit
+              </button>
+              <button
+                class="save-button"
+                id="New-defect-button"
+                type="button"
+                onclick="btnNewDefectClick()"
+              >
+                New
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="edit-defects">
+          <form id="defects-form" method="POST" action="/UpdateDefectSettings">
+            <div class="table-container">
+              <div class="table-header">Defects</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Select</th>
+                    <th>Part Name</th>
+                    <th>View</th>
+                    <th>Defect Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for defect in defect_details %}
+                  <tr>
+                    <td>
+                      <input
+                        type="checkbox"
+                        name="select-defect-row"
+                        onclick="selectOnlyOneDefectRow(this)"
+                      />
+                    </td>
+                    <td>{{ defect.PartName }}</td>
+                    <td>{{ defect.View }}</td>
+                    <td>{{ defect.DefectName }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock body %}

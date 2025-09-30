@@ -1,0 +1,1 @@
+Detection results: {'result_type': 'r', 'id': None, 'id_status': None, 'od': None, 'od_status': None, 'concentricity': None, 'concentricity_status': None, 'flash_defect': None, 'defect_position': None, 'orifice_diameter': None, 'orifice_status': None, 'result': 'error', 'error': 'not enough values to unpack (expected 2, got 1)', 'output_path': None}

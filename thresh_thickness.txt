@@ -1,0 +1,16 @@
+supoort  piston
+
+28.10.019   thresh 60
+22.10.013   thresh 60
+19.08.013   thresh 70
+16.06.012   thresh 80
+
+
+spacer   
+
+28.14.131    thresh 60
+
+
+Piston
+
+22.10.015  thresh 60

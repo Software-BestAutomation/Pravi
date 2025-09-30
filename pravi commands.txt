@@ -1,0 +1,927 @@
+code 1 : 
+
+import socket
+import threading
+import time
+import CameraConnection as cs
+import dbscript as DB
+import requests
+import queue
+import Cam1Detetction as Cam1Ddet
+import Cam2Detetction as Cam2Ddet
+import Cam3Detetction as Cam3Ddet
+import Cam4Detetction as Cam4Ddet
+import station1 as Station1_detection
+import data as dt
+
+from queue import Queue
+
+
+Cam1frame = None
+image2 = None
+image3 = None
+image4 = None
+
+# Define station queues globally
+St1 = Queue()
+St2 = Queue()
+St3 = Queue()
+St4 = Queue()
+
+station_queues = {
+    "C1": St1,
+    "C2": St2,
+    "C3": St3,
+    "C4": St4,
+}
+
+CONTROLLER_IP = "192.168.31.34" #192.168.31.47
+CONTROLLER_PORT = 80
+timeout = 5
+
+# Global control flag
+keep_running = True
+
+# Command and expected ACK pairs
+# COMMAND_SEQUENCE = [
+#     ("$CONV1_SPD=99#\r\n", "ACK_CONV1_SPD")
+#     ("$CONV2_SPD=99#\r\n", "ACK_CONV2_SPD")
+#     ("$VIBRTR_SPD=99#\r\n", "$ACK_VIBRTR_SPD"),
+#     ("$PRT_PUSH_MT_SPD=99#\r\n", "$ACK_PRT_PUSH_MT_SPD"),
+#     ("$INDX_SPD=99#\r\n", "$ACK_INDX_SPD"),
+#     ("$CAM1_HT=99#\r\n", "$ACK_CAM1_HT"),
+#     ("$CAM2_HT=99#\r\n", "$ACK_CAM2_HT"),
+#     ("$CAM3_HT=99#\r\n", "$ACK_CAM3_HT"),
+#     ("$CAM4_HT=99#\r\n", "$ACK_CAM4_HT"),
+#     ("$ST1_LIT_INT=99#\r\n", "$ACK_ST1_LIT_INT"),
+#     ("$ST2_LIT_INT=99#\r\n", "$ACK_ST2_LIT_INT"),
+#     ("$ST3_LIT_INT=99#\r\n", "$ACK_ST3_LIT_INT"),
+#     ("$ST4_LIT_INT=99#\r\n", "$ACK_ST4_LIT_INT"),
+#     ("$CAM1_CAP_DELAY=9999#\r\n", "$ACK_CAM1_CAP_DELAY"),
+#     ("$CAM2_CAP_DELAY=9999#\r\n", "$ACK_CAM2_CAP_DELAY"),
+#     ("$CAM3_CAP_DELAY=9999#\r\n", "$ACK_CAM3_CAP_DELAY"),
+#     ("$CAM4_CAP_DELAY=9999#\r\n", "$ACK_CAM4_CAP_DELAY")  
+
+# ]
+
+global sock
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+OutputFolder = r"D:\PIM_08-07-2025\Pravi_Flask\output_images"
+
+def build_command_sequence(param_dict):
+    # Normalize keys
+    param_dict = {key.replace(" ", ""): value for key, value in param_dict.items()}
+
+    command_list = []
+
+    camera_enabled = {
+        "S1": str(param_dict.get("S1:Camera1Enable", "1")) == "1",
+        "S2": str(param_dict.get("S2:Camera2Enable", "1")) == "1",
+        "S3": str(param_dict.get("S3:Camera3Enable", "1")) == "1",
+        "S4": str(param_dict.get("S4:Camera4Enable", "1")) == "1",
+    }
+
+    # Define a fixed order for commands
+    ordered_keys = [
+        # Enable flags (always included)
+        "S1:Camera1Enable", "S2:Camera2Enable", "S3:Camera3Enable", "S4:Camera4Enable",
+
+        # Station 1
+        "S1:CameraVerticalMoment", "S1:LightIntensity", "S1:CameraExposure", "S1:CameraGain", "S1:CapturingDelay",
+
+        # Station 2
+        "S2:CameraLateralMoment", "S2:LightIntensity", "S2:CameraExposure", "S2:CameraGain", "S2:CapturingDelay",
+
+        # Station 3
+        "S3:CameraVerticalMoment", "S3:LightIntensity", "S3:CameraExposure", "S3:CameraGain", "S3:CapturingDelay",
+
+        # Station 4
+        "S4:CameraVerticalMoment", "S4:LightIntensity", "S4:CameraExposure", "S4:CameraGain", "S4:CapturingDelay",
+
+        # Speed parameters
+        "SP:IndexingSpeed", "SP:VibratorSpeed", "SP:Conveyor1Speed", "SP:Conveyor2Speed", "SP:PartPushSpeed",
+    ]
+
+    mapping = {
+        "S1:Camera1Enable": "$CAM1_ENB={value}#",
+        "S2:Camera2Enable": "$CAM2_ENB={value}#",
+        "S3:Camera3Enable": "$CAM3_ENB={value}#",
+        "S4:Camera4Enable": "$CAM4_ENB={value}#",
+        "S1:CameraVerticalMoment": "$CAM1_VERT_MT={value}#",
+        "S1:LightIntensity": "$CAM1_LGT_INT={value}#",
+        # "S1:CameraExposure": "$CAM1_EXP={value}#",
+        # "S1:CameraGain": "$CAM1_GAIN={value}#",
+        "S1:CapturingDelay": "$CAM1_CAP_DELAY={value}#",
+        "S2:CameraLateralMoment": "$CAM2_LAT_MT={value}#",
+        "S2:LightIntensity": "$CAM2_LGT_INT={value}#",
+        # "S2:CameraExposure": "$CAM2_EXP={value}#",
+        # "S2:CameraGain": "$CAM2_GAIN={value}#",
+        "S2:CapturingDelay": "$CAM2_CAP_DELAY={value}#",
+        "S3:CameraVerticalMoment": "$CAM3_VERT_MT={value}#",
+        "S3:LightIntensity": "$CAM3_LGT_INT={value}#",
+        # "S3:CameraExposure": "$CAM3_EXP={value}#",
+        # "S3:CameraGain": "$CAM3_GAIN={value}#",
+        "S3:CapturingDelay": "$CAM3_CAP_DELAY={value}#",
+        "S4:CameraVerticalMoment": "$CAM4_VERT_MT={value}#",
+        "S4:LightIntensity": "$CAM4_LGT_INT={value}#",
+        # "S4:CameraExposure": "$CAM4_EXP={value}#",
+        # "S4:CameraGain": "$CAM4_GAIN={value}#",
+        "S4:CapturingDelay": "$CAM4_CAP_DELAY={value}#",
+        "SP:IndexingSpeed": "$INDX_SPD={value}#",
+        "SP:VibratorSpeed": "$VIBRTR_SPD={value}#",
+        "SP:Conveyor1Speed": "$CONV1_SPD={value}#",
+        "SP:Conveyor2Speed": "$CONV2_SPD={value}#",
+        "SP:PartPushSpeed": "$PRT_PUSH_MT_SPD={value}#",
+    }
+
+    for key in ordered_keys:
+        if key not in param_dict:
+            continue
+
+        if key.startswith("S1:") and not camera_enabled["S1"]:
+            continue
+        if key.startswith("S2:") and not camera_enabled["S2"]:
+            continue
+        if key.startswith("S3:") and not camera_enabled["S3"]:
+            continue
+        if key.startswith("S4:") and not camera_enabled["S4"]:
+            continue
+
+        if key in mapping:
+            value = param_dict[key]
+            command = mapping[key].format(value=value)
+            ack = "$ACK_" + command.strip("$#\r\n").split("=")[0]
+            command_list.append((command, ack))
+
+    print(f"✅ Command list built with {len(command_list)} commands")
+    return command_list
+
+
+def communicate_with_controller(param_dict):
+    global sock
+    global keep_running
+    keep_running = True
+
+    # Detect enabled cameras
+    enabled = {
+        "C1": str(param_dict.get("S1:Camera1Enable", "1")) == "1",
+        "C2": str(param_dict.get("S2:Camera2Enable", "1")) == "1",
+        "C3": str(param_dict.get("S3:Camera3Enable", "1")) == "1",
+        "C4": str(param_dict.get("S4:Camera4Enable", "1")) == "1",
+    }
+
+    # Prepare active stations
+    active_stations = [c for c in ["C1", "C2", "C3", "C4"] if enabled[c]]
+
+    # Create dynamic queues between active stations
+    station_queues = {}
+    for i in range(len(active_stations) - 1):
+        station_queues[active_stations[i]] = queue.Queue()
+    # Initialize first queue with a token
+    if active_stations:
+        station_queues[active_stations[0]].put(True)
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            sock.connect((CONTROLLER_IP, CONTROLLER_PORT))
+            print("✅ Connected to controller.")
+
+            command_list = build_command_sequence(param_dict)
+
+            # Step 1: Send each command and wait for ACK
+            for command, ack in command_list:
+                ack_received = False
+                while not ack_received:
+                    sock.sendall((command + "\r\n").encode())
+                    print(f"Sent: {command.strip()}")
+                    time.sleep(0.5)
+                    try:
+                        data = sock.recv(1024).decode()
+                        print(f"Received: {data.strip()}")
+                        if ack in data:
+                            ack_received = True
+                    except socket.timeout:
+                        continue
+
+            # Step 2: Send $STR# until $ACK_STR
+            ack_received = False
+            while not ack_received:
+                sock.sendall("$STR#\r\n".encode())
+                print("Sent: $STR#")
+                time.sleep(0.05)
+                try:
+                    data = sock.recv(1024).decode()
+                    print(f"Received: {data.strip()}")
+                    if "ACK_STR" in data:
+                        ack_received = True
+                        ConnectCam(param_dict)
+                except socket.timeout:
+                    continue
+
+            # Step 3: Listen for C1–C4 and trigger dynamically
+            while keep_running:
+                try:
+                    data = sock.recv(1024).decode().strip()
+                    print(f"Received: {data}")
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    print(f"❌ Error receiving data: {e}")
+                    break
+
+                for i, station in enumerate(active_stations):
+                    if station not in data:
+                        continue
+
+                    print(f"✅ {station} received")
+                    cam_id = f"cam{station[-1]}"
+
+                    # 1️⃣ Skip disabled cameras
+                    if not getattr(cs, f"isConnectedCamera{station[-1]}")():
+                        print(f"⚠️ {cam_id.upper()} is disabled. Passing OK to next stage.")
+                        if i < len(active_stations) - 1:
+                            station_queues[active_stations[i]].put(True)
+                        continue
+
+                    # 2️⃣ Check previous station’s result
+                    if i > 0:
+                        prev = active_stations[i - 1]
+                        try:
+                            ok = station_queues[prev].get(timeout=1)
+                        except Exception as e:
+                            print(f"❌ Error getting token from {prev}: {e}")
+                            ok = False
+
+                        if not ok:
+                            print(f"❌ Skipping {station} because previous stage returned NOK")
+                            # If this is C4, immediately notify controller
+                            if station == "C4":
+                                try:
+                                    sock.sendall("$NOK#\r\n".encode())
+                                    print("Sent: $NOK# (due to earlier NOK)")
+                                except Exception as e:
+                                    print(f"❌ Error sending NOK for {station}: {e}")
+                            else:
+                                # pass failure along to next station
+                                station_queues[station].put(False)
+                            continue
+
+                    # 3️⃣ Otherwise, trigger the camera normally
+                    try:
+                        threading.Thread(target=C_TriggeredProcess, args=(cam_id,)).start()
+                    except Exception as e:
+                        print(f"❌ Error starting trigger thread for {cam_id}: {e}")
+
+    except Exception as e:
+        print(f"❌ Error in communicate_with_controller: {e}")
+
+
+def C_TriggeredProcess(cam_id):
+     if cam_id == "cam1": 
+        thread = threading.Thread(target=Capture_Prosses_Triggerflask, args=("cam1",))
+        thread.start()
+
+     elif cam_id == "cam2":  
+        print("C_TriggeredProcess Started for cam2")
+        thread = threading.Thread(target=Capture_Prosses_Triggerflask, args=("cam2",))
+        thread.start()
+
+     elif cam_id == "cam3":  
+        thread = threading.Thread(target=Capture_Prosses_Triggerflask, args=("cam3",))
+        thread.start()
+
+     elif cam_id == "cam4":
+        thread = threading.Thread(target=Capture_Prosses_Triggerflask, args=("cam4",))
+        thread.start()
+
+
+def Capture_Prosses_Triggerflask(cam_id):
+    
+
+    if cam_id == "cam1": 
+
+        dt.Frames["Cam1frame"] = cs.capture_image_1() 
+        
+        ReadPythonResult(cam_id="cam1")
+        trigger_flask_camera(cam_id)
+
+
+    if cam_id == "cam2":  
+
+        print("Capture_Prosses_Triggerflask Started for cam2")
+        dt.Frames["Cam2frame"] = cs.capture_image_2()
+        ReadPythonResult(cam_id="cam2")
+        trigger_flask_camera(cam_id)
+
+
+    if cam_id == "cam3":  
+        
+        dt.Frames["Cam3frame"] = cs.capture_image_3()
+        ReadPythonResult(cam_id="cam3")
+        trigger_flask_camera(cam_id)
+
+    if cam_id == "cam4":
+
+        dt.Frames["Cam4frame"] = cs.capture_image_4()
+        ReadPythonResult(cam_id="cam4")
+        trigger_flask_camera(cam_id)
+
+# Globals for per-part DB state (reset at start of each new part)
+current_part_inserted = False
+inserted_s_no = None
+
+def ReadPythonResult(cam_id):
+
+    part_name = "PISTON"
+    subpart_name= ""
+    part_id= "P1S1"
+    date_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+    supplier_name = "S1"
+    invoice_no = "I1"
+    """
+    cam_id: "cam1".."cam4"
+    part_name, subpart_name, part_id:            context for DB
+    date_time:                                    timestamp for DB
+    supplier_name, invoice_no:                    final fields
+    """
+    global current_part_inserted, inserted_s_no
+
+    cam_num = int(cam_id[-1])
+    station = f"C{cam_num}"
+
+    # 1️⃣ If camera is disabled, skip it and pass an OK token
+    if not getattr(cs, f"isConnectedCamera{cam_num}")():
+        print(f"{cam_id.upper()} is disabled. Passing OK to next stage.")
+        if station != "C4":
+            station_queues[station].put(True)
+        return
+
+    # 2️⃣ Run detection and gather results
+    if cam_id == "cam1":
+        DB.load_python_parameters("P1S1")
+        
+        print(dt.python_parameters['S1'])
+        
+        params = dt.python_parameters['S1']
+        
+        # Now call the function with unpacked values
+        resultType, result, ID, IDstatus, OD, ODstatus,   Concentricity, ConcentricityStatus, FlashDefect, DefectPosition, OrificeDiameter, OrificeStatus, dim_err = Station1_detection.main(
+            part="PISTON",
+            subpart="28.10.021",
+            frame=dt.Frames["Cam1frame"],
+            id_min=params['IDMIN'],
+            id_max=params['IDMAX'],
+            od_min=params['ODMIN'],
+            od_max=params['ODMAX'],
+            concentricity_max=params['CONCENTRICITY'],
+            orifice_min=params['ORIFICEMIN'],
+            orifice_max=params['ORIFICEMAX'],
+            threshold_min=params['THRESHOLDMIN'],
+            threshold_max=params['THRESHOLDMAX'],
+            pixel_to_micron=25.39, 
+            pixel_to_micron_id=params['PIXELTOMICRON_ID'],
+            pixel_to_micron_od=params['PIXELTOMICRON_OD'],
+            output_folder= OutputFolder
+        )
+
+        print(f"{resultType}, {result}, {ID}, {IDstatus}, {OD}, {ODstatus}, {Concentricity}, {ConcentricityStatus}, {FlashDefect}, {DefectPosition}, {OrificeDiameter}, {OrificeStatus}, {dim_err}")
+
+
+
+
+        if not current_part_inserted:
+            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+                date_time, part_name, subpart_name, part_id, station,
+                ID, OD, OrificeDiameter, Concentricity, ConcentricityStatus, IDstatus, ODstatus,
+                "NA", "NA", "NA",   # thickness
+                "NA", "NA", "NA",   # top burr
+                "NA", "NA", "NA",   # bottom burr
+                supplier_name, invoice_no
+            )
+            current_part_inserted = True
+
+    elif cam_id == "cam2":
+        resultType, result, thick_img, thick_res, thick_err = Cam2Ddet.get_Image2()
+
+        if not current_part_inserted:
+            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+                date_time, part_name, subpart_name, part_id, station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",  # stn1
+                thick_img, thick_res, thick_err,          # stn2
+                "NA", "NA", "NA",                          # stn3
+                "NA", "NA", "NA",                          # stn4
+                supplier_name, invoice_no
+            )
+            current_part_inserted = True
+        else:
+            DB.update_workpartdetail_2nd_Station(
+                station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",  # stn1
+                thick_img, thick_res, thick_err,           # stn2
+                "NA", "NA", "NA",                          # stn3
+                "NA", "NA", "NA",                          # stn4
+                supplier_name, invoice_no,
+                inserted_s_no
+            )
+
+    elif cam_id == "cam3":
+        resultType, result, top_img, top_res, top_err = Cam3Ddet.get_Image3()
+
+        if not current_part_inserted:
+            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+                date_time, part_name, subpart_name, part_id, station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                top_img, top_res, top_err,
+                "NA", "NA", "NA",
+                supplier_name, invoice_no
+            )
+            current_part_inserted = True
+        else:
+            DB.update_workpartdetail_2nd_Station(
+                station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                top_img, top_res, top_err,
+                "NA", "NA", "NA",
+                supplier_name, invoice_no,
+                inserted_s_no
+            )
+
+    elif cam_id == "cam4":
+        resultType, result, bot_img, bot_res, bot_err = Cam4Ddet.get_Image4()
+
+        if not current_part_inserted:
+            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+                date_time, part_name, subpart_name, part_id, station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                bot_img, bot_res, bot_err,
+                supplier_name, invoice_no
+            )
+            current_part_inserted = True
+        else:
+            DB.update_workpartdetail_2nd_Station(
+                station,
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                "NA", "NA", "NA",
+                bot_img, bot_res, bot_err,
+                supplier_name, invoice_no,
+                inserted_s_no
+            )
+
+        # send final OK/NOK
+        try:
+            if resultType == "r" and result == "OK":
+                code = "$OK#\r\n"
+                DB.upsert_defect_count("OK")
+            else:
+                code = "$NOK#\r\n"
+                DB.upsert_defect_count("NOK")
+
+            sock.sendall(code.encode())
+            print(f"Sent: {code.strip()}")
+        except socket.timeout:
+            print("Socket timeout sending final result")
+
+    # 3️⃣ Pass token for next station (unless last)
+    if cam_id != "cam4":
+        station_queues[station].put(resultType == "r" and result == "OK")
+
+
+def trigger_flask_camera(cam_id):
+    try:
+        print(f"🔔 Notifying Flask to show {cam_id} image")
+        response = requests.post(f"http://127.0.0.1:9000/trigger/{cam_id}")
+        print("Flask Response:", response.status_code)
+    except Exception as e:
+        print("Error triggering Flask:", e)
+
+
+ # 📷 Connect only to enabled cameras
+
+
+def ConnectCam(param_dict):
+    # Normalize keys
+    param_dict = {key.replace(" ", ""): value for key, value in param_dict.items()}
+
+    camera_enabled = {
+        "cam1": str(param_dict.get("S1:Camera1Enable", "1")) == "1",
+        "cam2": str(param_dict.get("S2:Camera2Enable", "1")) == "1",
+        "cam3": str(param_dict.get("S3:Camera3Enable", "1")) == "1",
+        "cam4": str(param_dict.get("S4:Camera4Enable", "1")) == "1",
+    }
+
+    if camera_enabled["cam1"]:
+        cs.camera_connect1()
+    if camera_enabled["cam2"]:
+        cs.camera_connect2()
+    if camera_enabled["cam3"]:
+        cs.camera_connect3()
+    if camera_enabled["cam4"]:
+        cs.camera_connect4()
+
+
+
+
+# import socket
+# import threading
+# import time
+# import gettingstarted as gs
+# import dbscript as db
+# import requests
+# import Cam1Detetction as Cam1Ddet
+
+# CONTROLLER_IP = "192.168.31.47"
+# CONTROLLER_PORT = 80
+
+# c1_received = False # Global variable to track C1 reception
+ 
+# timeout = 5
+
+# # Command and expected ACK pairs
+# COMMAND_SEQUENCE = [
+#      ("$CONV1_SPD=99#\r\n", "ACK_CONV1_SPD")
+#     # ("$CONV2_SPD=99#\r\n", "ACK_CONV2_SPD")
+#     # ("$VIBRTR_SPD=99#\r\n", "$ACK_VIBRTR_SPD"),
+#     # ("$PRT_PUSH_MT_SPD=99#\r\n", "$ACK_PRT_PUSH_MT_SPD"),
+#     # ("$INDX_SPD=99#\r\n", "$ACK_INDX_SPD"),
+#     # ("$CAM1_HT=99#\r\n", "$ACK_CAM1_HT"),
+#     # ("$CAM2_HT=99#\r\n", "$ACK_CAM2_HT"),
+#     # ("$CAM3_HT=99#\r\n", "$ACK_CAM3_HT"),
+#     # ("$CAM4_HT=99#\r\n", "$ACK_CAM4_HT"),
+#     # ("$ST1_LIT_INT=99#\r\n", "$ACK_ST1_LIT_INT"),
+#     # ("$ST2_LIT_INT=99#\r\n", "$ACK_ST2_LIT_INT"),
+#     # ("$ST3_LIT_INT=99#\r\n", "$ACK_ST3_LIT_INT"),
+#     # ("$ST4_LIT_INT=99#\r\n", "$ACK_ST4_LIT_INT"),
+#     # ("$CAM1_CAP_DELAY=9999#\r\n", "$ACK_CAM1_CAP_DELAY"),
+#     # ("$CAM2_CAP_DELAY=9999#\r\n", "$ACK_CAM2_CAP_DELAY"),
+#     # ("$CAM3_CAP_DELAY=9999#\r\n", "$ACK_CAM3_CAP_DELAY"),
+#     # ("$CAM4_CAP_DELAY=9999#\r\n", "$ACK_CAM4_CAP_DELAY")
+# ]
+
+# def communicate_with_controller(start=True):
+#     global c1_received
+#     try:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+#             sock.settimeout(timeout)
+#             sock.connect((CONTROLLER_IP, CONTROLLER_PORT))
+#             print("Connected to controller.")
+
+#             if start:
+#                 # STEP 1: Send each command and wait for individual ACKs
+#                 for command, ack in COMMAND_SEQUENCE:
+#                     ack_received = False
+#                     while not ack_received:
+#                         sock.sendall(command.encode())
+#                         print(f"Sent: {command.strip()}")
+#                         time.sleep(0.05)
+#                         try:
+#                             data = sock.recv(1024).decode()
+#                             print(f"Received: {data.strip()}")
+#                             if ack in data:
+#                                 ack_received = True
+#                         except socket.timeout:
+#                             continue
+
+#                 # STEP 2: Send $STR# repeatedly until $ACK_STR is received
+#                 ack_received = False
+#                 while not ack_received:
+#                     sock.sendall("$STR#\r\n".encode())
+#                     print("Sent: $STR#")
+#                     time.sleep(0.05)
+#                     try:
+#                         data = sock.recv(1024).decode()
+#                         print(f"Received: {data.strip()}")
+#                         if "ACK_STR" in data:
+#                           #  ConnectCam()
+#                             ack_received = True
+#                     except socket.timeout:
+#                         continue
+
+#                 # STEP 3: Wait for C1, then send $ACK_C1#
+#                 c1_received = False
+#                 while not c1_received:
+#                     try:
+#                         data = sock.recv(1024).decode()
+#                         print(f"Received: {data.strip()}")
+#                         if "C1" in data:
+#                             c1_received = True
+#                          #  cs.capture_image_1()
+#                             response = requests.post("http://127.0.0.1:9000/trigger")
+#                             print("Received C1 trigger to Flask:", response.status_code)
+                           
+#                             sock.sendall("$ACK_C1#\r\n".encode())
+#                             print("Sent: $ACK_C1#")
+#                     except socket.timeout:
+#                         continue
+
+#             else:
+#                 # STEP STOP: Send $STP# repeatedly until $ACK_STP is received
+#                 ack_received = False
+#                 while not ack_received:
+#                     sock.sendall("$STP#\r\n".encode())
+#                     print("Sent: $STP#")
+#                     time.sleep(0.05)
+#                     try:
+#                         data = sock.recv(1024).decode()
+#                         print(f"Received: {data.strip()}")
+#                         if "ACK_STP" in data:
+#                             ack_received = True
+#                     except socket.timeout:
+#                         continue
+
+#               #  STEP STOP NEXT: Wait for C1 and send $ACK_C1#
+#                 c1_received = False
+#                 while not c1_received:
+#                     try:
+#                         data = sock.recv(1024).decode()
+#                         print(f"Received: {data.strip()}")
+#                         if "C1" in data:
+#                             c1_received = True
+#                            # cs.capture_image_1()
+#                             # Cam1PythonCodeCall()
+#                             response = requests.post("http://127.0.0.1:9000/trigger")
+#                             print("Received C1 trigger to Flask:", response.status_code)
+#                             sock.sendall("$ACK_C1#\r\n".encode())
+#                             print("Sent: $ACK_C1#")
+#                     except socket.timeout:
+#                         continue
+
+#     except Exception as e:
+#         print(f"Error: {str(e)}")
+
+# def start_process():
+#     threading.Thread(target=communicate_with_controller, args=(True,)).start()
+
+# def stop_process():
+#    # cs.camera_disconnect()
+#     threading.Thread(target=communicate_with_controller, args=(False,)).start()
+
+# #def ImageCapturingCam1():
+# #    threading.Thread(target=cs.capture_image_1).start()
+
+# def Cam1PythonCodeCall():
+#      def wrapper():
+#          ID, OD = Cam1Ddet.get_dimensions()
+#          print(f"ID: {ID}, OD: {OD}")
+         
+#          date_time = time.strftime("%Y-%m-%d %H:%M:%S")
+#          part_name = "A"
+#          subpart_name = "A1"
+
+
+#          db.insert_workpartdetail_1st_Station(ID, OD)
+
+
+#         #  date_time, part_name, subpart_name, part_id, current_station, ID, OD, orifice,
+#         #                   concentricity, dimension_cam_image, dimension_result, dimension_cam_error_description,
+#         #                   thickness_cam_image, thickness_result, thickness_cam_error_description, topburr_cam_image,
+#         #                   topburr_result, topburr_cam_error_description, bottom_cam_image, bottom_result,
+#         #                   bottom_cam_error_description, supplier_name, invoice_no):
+    
+                            
+#                         #   datetime, partname, subpartname, p1s1, 1, 10, 20, 30, 40, dimensionImage.png, OK, ID_is_not_good, na, na, na, na, na, na, na, na, na, suppliername, invoice123 
+
+     
+#      threading.Thread(target=wrapper).start()  
+#     # print('target',target)
+
+    
+# def ImageCapturingCam1():
+#    print('ImageCapturingCam1')
+#    threading.Thread(target=cs.capture_image_1).start()
+
+# def ConnectCam():
+#     threading.Thread(target=cs.camera_connect).start()
+
+
+code :-2
+
+import defect as dt
+import cv2
+import numpy as np
+
+
+def main(part, subpart, frame,
+         id_min, id_max, od_min, od_max,
+         concentricity_max, orifice_min, orifice_max,
+         threshold_id2, threshold_id3, threshold_od2, threshold_od3,
+         pixel_to_micron, pixel_to_micron_id, pixel_to_micron_od,
+         output_folder):
+
+    # Convert string parameters to float 
+    try:
+        id_min = float(id_min) if id_min != "NA" else None
+        id_max = float(id_max) if id_max != "NA" else None
+        od_min = float(od_min) if od_min != "NA" else None
+        od_max = float(od_max) if od_max != "NA" else None
+        concentricity_max = float(
+            concentricity_max) if concentricity_max != "NA" else None
+        orifice_min = float(orifice_min) if orifice_min != "NA" else None
+        orifice_max = float(orifice_max) if orifice_max != "NA" else None
+        threshold_id2 = int(threshold_id2) if threshold_id2 != "NA" else None
+        threshold_id3 = int(threshold_id3) if threshold_id3 != "NA" else None
+        threshold_od2 = int(threshold_od2) if threshold_od2 != "NA" else None
+        threshold_od3 = int(threshold_od3) if threshold_od3 != "NA" else None
+        pixel_to_micron = float(pixel_to_micron)
+        pixel_to_micron_id = float(pixel_to_micron_id)
+        pixel_to_micron_od = float(pixel_to_micron_od)
+
+    except ValueError as e:
+        print("r")
+        print("Result: NOK")
+        print("Error: parameter_conversion")
+        print("ID: 0.0mm, Status: NOK")
+        print("OD: 0.0mm, Status: NOK")
+        print("Concentricity: NA")
+        print("flash_defect: NOK")
+        print("defect_position: None")
+        print("Orifice: NA")
+        # print("Output path: None")
+        return ("e", "NOK", "0.0mm, Status: NOK", "0.0mm, Status: NOK", "NA", "NA", None, "", "parameter_conversion")
+
+    result = {
+        'resultType': 'r',
+        'result': 'OK',
+        'errorType': None,
+        'image_path': None,
+        'measurements': {
+            'id': {'value': 0.0, 'status': 'OK'},
+            'od': {'value': 0.0, 'status': 'OK'},
+            'concentricity': {'value': 0.0, 'status': 'OK'},
+            'flash': {'result': 'OK', 'position': 'None'},
+            'orifice': {'value': 0.0, 'status': 'OK'}
+        }
+    }
+
+    try:
+        processed = dt.preprocess_image(frame, output_folder)
+        if len(processed["sorted_contours"]) < 2:
+            raise ValueError("Not enough contours found for ID/OD measurement")
+        contours = processed["sorted_contours"]
+
+        if part == "PISTON":
+            dims = dt.id_od_dimension(
+                frame, contours, id_min, id_max, od_min, od_max, pixel_to_micron_id, pixel_to_micron_od)
+            
+            conc = dt.concentricity(dims['center_x_od'], dims['center_y_od'],
+                                    dims['center_x_id'], dims['center_y_id'], concentricity_max, pixel_to_micron)
+            
+            flash = dt.flash_detection(frame, dims['id_contour'], dims['od_contour'],
+                                       threshold_id2, threshold_id3, threshold_od2, threshold_od3, output_folder)
+
+            orifice_data = None
+            if orifice_min is not None and orifice_max is not None:
+                orifice_data = dt.measure_orifice(
+                    frame, orifice_min, orifice_max, pixel_to_micron)
+                result['measurements']['orifice'].update({
+                    'value': orifice_data['orifice_diameter_mm'],
+                    'status': orifice_data['orifice_status']
+                })
+
+            result['measurements'].update({
+                'id': {'value': dims['diameter_id_mm'], 'status': dims['id_status']},
+                'od': {'value': dims['diameter_od_mm'], 'status': dims['od_status']},
+                'concentricity': {'value': conc['concentricity_mm'], 'status': conc['concentricity_status']},
+                'flash': {'result': flash['Defect_Result'], 'position': flash['defect_position']}
+            })
+
+            save_result = dt.save_final_result_image(
+                processed["image"], dims, flash, conc, orifice_data, output_folder)
+            result['image_path'] = save_result['output_path']
+
+        elif part in ["TEFLON PISTON RING", "SUPPORT PISTON RING", "SUPPORT PISTON", "OIL SEAL", "SPACER", "GUIDE END", "WASHER"]:
+
+            dims = dt.id_od_dimension(
+                frame, contours, id_min, id_max, od_min, od_max, pixel_to_micron_id, pixel_to_micron_od)
+            
+            conc = dt.concentricity(dims['center_x_od'], dims['center_y_od'],
+                                    dims['center_x_id'], dims['center_y_id'], concentricity_max, pixel_to_micron)
+            
+            flash = dt.flash_detection(frame, dims['id_contour'], dims['od_contour'],
+                                       threshold_id2, threshold_id3, threshold_od2, threshold_od3, output_folder)
+
+            result['measurements'].update({
+                'id': {'value': dims['diameter_id_mm'], 'status': dims['id_status']},
+                'od': {'value': dims['diameter_od_mm'], 'status': dims['od_status']},
+                'concentricity': {'value': conc['concentricity_mm'], 'status': conc['concentricity_status']},
+                'flash': {'result': flash['Defect_Result'], 'position': flash['defect_position']}
+            })
+
+            save_result = dt.save_final_result_image(
+                processed["image"], dims, flash, conc, None, output_folder)
+            result['image_path'] = save_result['output_path']
+
+        elif part in ["O RING", "NRV WASHER", "PISTON RING", "TEFLON RING", "NRV SEAL"]:
+
+            dims = dt.id_od_dimension(
+                frame, contours, id_min, id_max, od_min, od_max, pixel_to_micron_id, pixel_to_micron_od)
+            
+            flash = dt.flash_detection(frame, dims['id_contour'], dims['od_contour'],
+                                       threshold_id2, threshold_id3, threshold_od2, threshold_od3, output_folder)
+
+            result['measurements'].update({
+                'id': {'value': dims['diameter_id_mm'], 'status': dims['id_status']},
+                'od': {'value': dims['diameter_od_mm'], 'status': dims['od_status']},
+                'flash': {'result': flash['Defect_Result'], 'position': flash['defect_position']}
+            })
+
+            save_result = dt.save_final_result_image(
+                processed["image"], dims, flash, None, output_folder=output_folder)
+            result['image_path'] = save_result['output_path']
+
+        defect_lines = []
+        if result['measurements']['id']['status'] == "NOK" or result['measurements']['od']['status'] == "NOK":
+            defect_lines.append("ID/OD dimension")
+        if 'concentricity' in result['measurements'] and result['measurements']['concentricity']['status'] == "NOK":
+            defect_lines.append("Concentricity dimension")
+        if result['measurements']['flash']['result'] != "OK":
+            defect_lines.append(
+                f"Flash on {result['measurements']['flash']['position']}")
+        if 'orifice' in result['measurements'] and result['measurements']['orifice']['status'] == "NOK":
+            defect_lines.append("Orifice dimension")
+
+        diameter_id_mm = result['measurements']['id']['value']
+        id_status = result['measurements']['id']['status']
+        diameter_od_mm = result['measurements']['od']['value']
+        od_status = result['measurements']['od']['status']
+        concentricity_mm = result['measurements']['concentricity']['value'] if 'concentricity' in result['measurements'] else None
+        concentricity_status = result['measurements']['concentricity'][
+            'status'] if 'concentricity' in result['measurements'] else None
+        flash_defect = result['measurements']['flash']['result']
+        defect_position = result['measurements']['flash']['position']
+        orifice_diameter_mm = result['measurements']['orifice']['value'] if 'orifice' in result['measurements'] else None
+        orifice_status = result['measurements']['orifice']['status'] if 'orifice' in result['measurements'] else None
+        output_path = result['image_path']
+
+        # print statement
+        print("r")
+        print("Result:", "NOK" if defect_lines else "OK")
+        if defect_lines:
+            print("Error:", ", ".join(defect_lines))
+        print(f"ID: {diameter_id_mm}mm, Status: {id_status}")
+        print(f"OD: {diameter_od_mm}mm, Status: {od_status}")
+        print(
+            f"Concentricity: {concentricity_mm}mm, Status: {concentricity_status}" if concentricity_mm is not None else "Concentricity: NA")
+        print(f"flash_defect: {flash_defect}")
+        print(f"defect_position: {defect_position}")
+        print(
+            f"Orifice: {orifice_diameter_mm}mm, Status: {orifice_status}" if orifice_diameter_mm is not None else "Orifice: NA")
+        print(f"Output path: {output_path}")
+
+        return (
+            "r",
+            f"Result: {'NOK' if defect_lines else 'OK'}",
+            f"Error: {', '.join(defect_lines)}" if defect_lines else "Error: None",
+            f"ID: {diameter_id_mm}mm, Status: {id_status}",
+            f"OD: {diameter_od_mm}mm, Status: {od_status}",
+            f"Concentricity: {concentricity_mm}mm, Status: {concentricity_status}" if concentricity_mm is not None else "Concentricity: NA",
+            f"flash_defect: {flash_defect}",
+            f"defect_position: {defect_position}",
+            f"Orifice: {orifice_diameter_mm}mm, Status: {orifice_status}" if orifice_diameter_mm is not None else "Orifice: NA",
+            f"Output path: {output_path}"
+        )
+      
+
+    except Exception as e:
+        print("r")
+        print("Result: NOK")
+        print("Error:", str(e))
+        print("ID: 0.0mm, Status: NOK")
+        print("OD: 0.0mm, Status: NOK")
+        print("Concentricity: NA")
+        print("flash_defect: NOK")
+        print("defect_position: None")
+        print("Orifice: NA")
+        print("Output path: None")
+
+        return ("e", "NOK", "0.0mm, Status: NOK", "0.0mm, Status: NOK", "NA", "NA", None, "", str(e))
+
+
+
+now in 2nd code , we are  giving written statement like this
+
+        return (
+            "r",
+            f"Result: {'NOK' if defect_lines else 'OK'}",
+            f"Error: {', '.join(defect_lines)}" if defect_lines else "Error: None",
+            f"ID: {diameter_id_mm}mm, Status: {id_status}",
+            f"OD: {diameter_od_mm}mm, Status: {od_status}",
+            f"Concentricity: {concentricity_mm}mm, Status: {concentricity_status}" if concentricity_mm is not None else "Concentricity: NA",
+            f"flash_defect: {flash_defect}",
+            f"defect_position: {defect_position}",
+            f"Orifice: {orifice_diameter_mm}mm, Status: {orifice_status}" if orifice_diameter_mm is not None else "Orifice: NA",
+            f"Output path: {output_path}" 
+
+
+we do not want written statement above , we want wriiten statement like below in shortcut resultType, result, ID, IDstatus, OD, ODstatus,   Concentricity, ConcentricityStatus, FlashDefect, DefectPosition, OrificeDiameter, OrificeStatus, dim_err . so rewrite 2nd code for that written statement changes.
+
+
+
+
+
+$ACK_CAM1_ENB#$ACK_CAM4_ENB#$ACK_CAM1_VERT_MT#$ACK_CAM1_LGT_INT#$ACK_CAM1_CAP_DELAY=#$ACK_CAM4_VERT_MT=#$ACK_CAM4_LGT_INT=#$ACK_CAM4_CAP_DELAY=#$ACK_INDX_SPD=#$ACK_VIBRTR_SPD=#$ACK_CONV1_SPD=#$ACK_CONV2_SPD=#$ACK_PRT_PUSH_MT_SPD=#$ACK_STR#$ACK_CAM1_ENB#$ACK_CAM4_ENB#$ACK_CAM1_VERT_MT#$ACK_CAM1_LGT_INT#$ACK_CAM1_CAP_DELAY=#$ACK_CAM4_VERT_MT=#$ACK_CAM4_LGT_INT=#$ACK_CAM4_CAP_DELAY=#$ACK_INDX_SPD=#$ACK_VIBRTR_SPD=#$ACK_CONV1_SPD=#$ACK_CONV2_SPD=#$ACK_PRT_PUSH_MT_SPD=#$ACK_STR#

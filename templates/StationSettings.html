@@ -1,0 +1,894 @@
+{% extends 'Base.html' %} {% block body %}
+
+<style>
+  .h3 {
+    font-size: 1.75rem;
+    margin: 0.5rem;
+  }
+
+  .parent {
+    display: flex;
+    margin-top: 4rem;
+    flex-direction: column;
+  }
+
+  .middle1,
+  .middle2 {
+    display: flex;
+    flex-direction: row;
+    height: 20rem;
+  }
+
+  .Station1,
+  .Station2,
+  .Station3,
+  .Station4 {
+    padding: 5px;
+    box-shadow: 0 3px 9px -3px black;
+    border-radius: 5px;
+    margin: 0.5rem;
+    height: 19rem;
+  }
+
+  .div1 {
+    height: 50px;
+    height: 2.5rem;
+  }
+
+  .div2 {
+    height: 50px;
+    width: 100%;
+    height: 22rem;
+  }
+
+  .div3 {
+    height: 50px;
+    width: 100%;
+    height: 22rem;
+  }
+
+  .div5 {
+    height: 50px;
+    width: 100%;
+    height: 22rem;
+  }
+
+  .div4 {
+    height: 50px;
+    width: 100%;
+    height: 22rem;
+  }
+
+  .Station1Settings,
+  .Station2Settings,
+  .Station3Settings,
+  .Station4Settings {
+    display: flex;
+    justify-content: space-around;
+    flex-direction: row;
+  }
+
+  .Station1div1,
+  .Station2div1,
+  .Station3div1,
+  .Station4div1 {
+    display: flex;
+    align-items: self-end;
+    flex-direction: column;
+  }
+
+  .Station1div2,
+  .Station2div2,
+  .Station3div2,
+  .Station4div2 {
+    display: flex;
+    align-items: self-end;
+    flex-direction: column;
+  }
+
+  label {
+    display: inline-block;
+    font-size: larger;
+    font-weight: 600;
+  }
+
+  .inputs {
+    margin: 1.2rem;
+  }
+
+  select,
+  select option {
+    text-transform: none;
+    width: 10rem;
+    height: 2rem;
+  }
+
+  .save-button {
+    background-color: #040468;
+    width: 9rem;
+    color: white;
+    padding: 3px 2px 10px 2px;
+    font-size: 26px;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    outline: none;
+    height: 3rem;
+  }
+
+  .save-button:hover {
+    background-color: #18186b;
+    /* Lighter blue */
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .save-button:active {
+    background-color: #040468;
+    /* Slightly darker */
+    transform: scale(0.98);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .save-button:focus {
+    border: 2px solid #18186b;
+    box-shadow: 0 0 0 4px;
+  }
+
+  .PartSelection {
+    margin-left: 6rem;
+    display: flex;
+  }
+
+  .SpeedSettings {
+    height: 115px;
+    /* display: flex
+; */
+    /* flex-direction: row; */
+    /* justify-content: space-evenly; */
+    align-items: center;
+    padding: 5px;
+    box-shadow: 0 3px 9px -3px black;
+    border-radius: 5px;
+    margin: 0.5rem;
+  }
+
+  .speeds {
+    display: flex;
+    justify-content: space-evenly;
+  }
+
+  .PartSelection {
+    margin-left: 6rem;
+  }
+
+  .selectpart {
+    margin-left: 2rem;
+    margin-right: 2rem;
+  }
+
+  .selectsubpart {
+    margin-left: 3rem;
+    margin-right: 5rem;
+  }
+
+  .Save {
+    display: flex;
+    justify-content: end;
+    margin-top: 0.5rem;
+    margin-right: 4rem;
+  }
+</style>
+
+
+
+
+<script>
+  
+function fetchSubparts() {
+    const selectedPart = document.getElementById('selectpart').value;
+    const subpartSelect = document.getElementById('selectsubpart');
+    
+    // Clear existing subpart options
+    subpartSelect.innerHTML = '<option value="">Select Subpart</option>';
+    
+    if (selectedPart) {
+        fetch('/get_subparts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({part: selectedPart})
+        })
+        .then(response => response.json())
+        .then(data => {
+            data.subparts.forEach(subpart => {
+                const option = document.createElement('option');
+                option.value = subpart;
+                option.textContent = subpart;
+                subpartSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+}
+
+
+  function ValidateNumber(event) {
+    let value = event.target.value;
+    value = value.replace(/[^0-9.]/g, "");
+    const parts = value.split(".");
+    if (parts.length > 2) {
+      value = parts[0] + "." + parts.slice(1).join("");
+    }
+    event.target.value = value;
+  }
+  
+  
+  function saveParameters() {
+    const part = document.getElementById("selectpart").value;
+    const subpart = document.getElementById("selectsubpart").value;
+
+    const parameters = [
+      // Station 1
+      {
+        Place: "S1",
+        Parameter: "CameraVerticalMoment",
+        Value: document.getElementById("cameraHeight1").value,
+      },
+      {
+        Place: "S1",
+        Parameter: "LightIntensity",
+        Value: document.getElementById("lightIntensity1").value,
+      },
+      {
+        Place: "S1",
+        Parameter: "CameraExposure",
+        Value: document.getElementById("cameraExposure1").value,
+      },
+      {
+        Place: "S1",
+        Parameter: "CameraGain",
+        Value: document.getElementById("cameraGain1").value,
+      },
+      {
+        Place: "S1",
+        Parameter: "CapturingDelay",
+        Value: document.getElementById("capturingDelay1").value,
+      },
+      {
+        Place: "S1",
+        Parameter: "Camera1Enable",
+        Value: document.getElementById("Cam1EnableDisable").value,
+      },
+
+      // Station 2
+      {
+        Place: "S2",
+        Parameter: "CameraLateralMoment",
+        Value: document.getElementById("cameraHorizontalmoment").value,
+      },
+      {
+        Place: "S2",
+        Parameter: "LightIntensity",
+        Value: document.getElementById("lightIntensity2").value,
+      },
+      {
+        Place: "S2",
+        Parameter: "CameraExposure",
+        Value: document.getElementById("cameraExposure2").value,
+      },
+      {
+        Place: "S2",
+        Parameter: "CameraGain",
+        Value: document.getElementById("cameraGain2").value,
+      },
+      {
+        Place: "S2",
+        Parameter: "CapturingDelay",
+        Value: document.getElementById("capturingDelay2").value,
+      },
+      {
+        Place: "S2",
+        Parameter: "Camera2Enable",
+        Value: document.getElementById("Cam2EnableDisable").value,
+      },
+
+      // Station 3
+      {
+        Place: "S3",
+        Parameter: "CameraVerticalMoment",
+        Value: document.getElementById("cameraHeight3").value,
+      },
+      {
+        Place: "S3",
+        Parameter: "LightIntensity",
+        Value: document.getElementById("lightIntensity3").value,
+      },
+      {
+        Place: "S3",
+        Parameter: "CameraExposure",
+        Value: document.getElementById("cameraExposure3").value,
+      },
+      {
+        Place: "S3",
+        Parameter: "CameraGain",
+        Value: document.getElementById("cameraGain3").value,
+      },
+      {
+        Place: "S3",
+        Parameter: "CapturingDelay",
+        Value: document.getElementById("capturingDelay3").value,
+      },
+      {
+        Place: "S3",
+        Parameter: "Camera3Enable",
+        Value: document.getElementById("Cam3EnableDisable").value,
+      },
+
+      // Station 4
+      {
+        Place: "S4",
+        Parameter: "CameraVerticalMoment",
+        Value: document.getElementById("cameraHeight4").value,
+      },
+      {
+        Place: "S4",
+        Parameter: "LightIntensity",
+        Value: document.getElementById("lightIntensity4").value,
+      },
+      {
+        Place: "S4",
+        Parameter: "CameraExposure",
+        Value: document.getElementById("cameraExposure4").value,
+      },
+      {
+        Place: "S4",
+        Parameter: "CameraGain",
+        Value: document.getElementById("cameraGain4").value,
+      },
+      {
+        Place: "S4",
+        Parameter: "CapturingDelay",
+        Value: document.getElementById("capturingDelay4").value,
+      },
+      {
+        Place: "S4",
+        Parameter: "Camera4Enable",
+        Value: document.getElementById("Cam4EnableDisable").value,
+      },
+
+      // Speed settings (shared place = SP)
+      {
+        Place: "SP",
+        Parameter: "VibratorSpeed",
+        Value: document.getElementById("VibratorSpeed").value,
+      },
+      {
+        Place: "SP",
+        Parameter: "Conveyor1Speed",
+        Value: document.getElementById("Conv1Speed").value,
+      },
+      {
+        Place: "SP",
+        Parameter: "Conveyor2Speed",
+        Value: document.getElementById("Conv2Speed").value,
+      },
+      {
+        Place: "SP",
+        Parameter: "IndexingSpeed",
+        Value: document.getElementById("IndexingSpeed").value,
+      },
+      {
+        Place: "SP",
+        Parameter: "PartPushSpeed",
+        Value: document.getElementById("PushPartSpeed").value,
+      },
+    ];
+
+    // Send to backend
+    fetch("/update_station_parameters", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ part, subpart, parameters }),
+    })
+      .then((response) => {
+        if (response.ok) {
+          alert("Parameters saved successfully!");
+        } else {
+          alert("Failed to save parameters.");
+        }
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        alert("Error occurred while saving parameters.");
+      });
+  }
+
+  function fetchParameters() {
+    var part = document.getElementById("selectpart").value;
+    var subpart = document.getElementById("selectsubpart").value;
+
+    if (part && subpart) {
+      fetch("/get_station_parameters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ part: part, subpart: subpart }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          populateStationInputs(data);
+        });
+    }
+  }
+
+  function populateStationInputs(data) {
+    // Clear all text inputs
+    document
+      .querySelectorAll('input[type="text"]')
+      .forEach((input) => (input.value = ""));
+
+    // Map parameter names to input field IDs
+    const inputIdMap = {
+      S1: {
+        Camera1Enable: "Cam1EnableDisable",
+        CameraVerticalMoment: "cameraHeight1",
+        LightIntensity: "lightIntensity1",
+        CameraExposure: "cameraExposure1",
+        CameraGain: "cameraGain1",
+        CapturingDelay: "capturingDelay1",
+      },
+      S2: {
+        Camera2Enable: "Cam2EnableDisable",
+        CameraLateralMoment: "cameraHorizontalmoment",
+        LightIntensity: "lightIntensity2",
+        CameraExposure: "cameraExposure2",
+        CameraGain: "cameraGain2",
+        CapturingDelay: "capturingDelay2",
+      },
+      S3: {
+        Camera3Enable: "Cam3EnableDisable",
+        CameraVerticalMoment: "cameraHeight3",
+        LightIntensity: "lightIntensity3",
+        CameraExposure: "cameraExposure3",
+        CameraGain: "cameraGain3",
+        CapturingDelay: "capturingDelay3",
+      },
+      S4: {
+        Camera4Enable: "Cam4EnableDisable",
+        CameraVerticalMoment: "cameraHeight4",
+        LightIntensity: "lightIntensity4",
+        CameraExposure: "cameraExposure4",
+        CameraGain: "cameraGain4",
+        CapturingDelay: "capturingDelay4",
+      },
+      SP: {
+        VibratorSpeed: "VibratorSpeed",
+        Conveyor1Speed: "Conv1Speed",
+        Conveyor2Speed: "Conv2Speed",
+        IndexingSpeed: "IndexingSpeed",
+        PartPushSpeed: "PushPartSpeed",
+      },
+    };
+
+    // Fill the inputs with values
+    data.forEach((param) => {
+      const place = param.Place;
+      const parameter = param.Parameter;
+      const value = param.Value;
+
+      console.log(`Place: ${place}, Parameter: ${parameter}, Value: ${value}`);
+
+      if (inputIdMap[place] && inputIdMap[place][parameter]) {
+        const inputId = inputIdMap[place][parameter];
+        console.log(`Mapping to input ID: ${inputId}`);
+        document.getElementById(inputId).value = value;
+      } else {
+        console.warn(`No matching input field for ${place} - ${parameter}`);
+      }
+    });
+  }
+
+
+</script>
+
+<div>
+  <div class="parent">
+    <div class="div1">
+     <div class="PartSelection">
+    <div class="selectpart">
+        <label>Part</label>
+        <select id="selectpart" name="selectpart" onchange="fetchSubparts()">
+            <option value="">Select Part</option>
+            {% for part in parts %}
+            <option value="{{ part }}">{{ part }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="selectsubpart">
+        <label>SubPart</label>
+        <select id="selectsubpart" name="selectsubpart" onchange="fetchParameters()">
+            <option value="">Select Subpart</option>
+            <!-- Subparts will be populated dynamically -->
+        </select>
+    </div>
+</div>
+
+
+    </div>
+
+    <div class="middle1">
+      <div class="div2">
+        <div class="Station1">
+          <h3>Station 1</h3>
+
+          <div class="Station1Settings">
+            <div class="Station1div1">
+              <div class="inputs">
+                <label for="cameraHeight1">Camera Vertical Moment:</label>
+                <input
+                  type="text"
+                  id="cameraHeight1"
+                  name="cameraHeight1"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="lightIntensity1">Light Intensity:</label>
+                <input
+                  type="text"
+                  id="lightIntensity1"
+                  name="lightIntensity1"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="cameraExposure1">Camera Exposure:</label>
+                <input
+                  type="text"
+                  id="cameraExposure1"
+                  name="cameraExposure1"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+
+            <div class="Station1div2">
+              <div class="inputs">
+                <label for="cameraGain1">Camera Gain:</label>
+                <input
+                  type="text"
+                  id="cameraGain1"
+                  name="cameraGain1"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="capturingDelay1">Capturing Delay:</label>
+                <input
+                  type="text"
+                  id="capturingDelay1"
+                  name="capturingDelay1"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="Cam1EnableDisable">Camera 1 Enable:</label>
+                <!-- <select id="Cam1EnableDisable" name="Cam1EnableDisable">
+                                    <option value="Yes">YES</option>
+                                    <option value="NO">NO</option>
+                                </select> -->
+                <input
+                  type="text"
+                  id="Cam1EnableDisable"
+                  name="Cam1EnableDisable"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="div3">
+        <div class="Station2">
+          <h3>Station 2</h3>
+
+          <div class="Station2Settings">
+            <div class="Station2div1">
+              <div class="inputs">
+                <label for="cameraHorizontalmoment"
+                  >Camera Lateral Moment:</label
+                >
+                <input
+                  type="text"
+                  id="cameraHorizontalmoment"
+                  name="cameraHorizontalmoment"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="lightIntensity2">Light Intensity:</label>
+                <input
+                  type="text"
+                  id="lightIntensity2"
+                  name="lightIntensity2"
+                  placeholder="Enter Light Intensity"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="cameraExposure2">Camera Exposure:</label>
+                <input
+                  type="text"
+                  id="cameraExposure2"
+                  name="cameraExposure2"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+
+            <div class="Station2div2">
+              <div class="inputs">
+                <label for="cameraGain2">Camera Gain:</label>
+                <input
+                  type="text"
+                  id="cameraGain2"
+                  name="cameraGain2"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="capturingDelay2">Capturing Delay:</label>
+                <input
+                  type="text"
+                  id="capturingDelay2"
+                  name="capturingDelay2"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="Cam2EnableDisable">Camera 2 Enable:</label>
+                <input
+                  type="text"
+                  id="Cam2EnableDisable"
+                  name="Cam2EnableDisable"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="middle2">
+      <div class="div4">
+        <div class="Station3">
+          <h3>Station 3</h3>
+
+          <div class="Station3Settings">
+            <div class="Station3div1">
+              <div class="inputs">
+                <label for="cameraHeight3">Camera Vertical Moment:</label>
+                <input
+                  type="text"
+                  id="cameraHeight3"
+                  name="cameraHeight3"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="lightIntensity3">Light Intensity:</label>
+                <input
+                  type="text"
+                  id="lightIntensity3"
+                  name="lightIntensity3"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="cameraExposure3">Camera Exposure:</label>
+                <input
+                  type="text"
+                  id="cameraExposure3"
+                  name="cameraExposure3"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+
+            <div class="Station3div2">
+              <div class="inputs">
+                <label for="cameraGain3">Camera Gain:</label>
+                <input
+                  type="text"
+                  id="cameraGain3"
+                  name="cameraGain3"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="capturingDelay3">Capturing Delay:</label>
+                <input
+                  type="text"
+                  id="capturingDelay3"
+                  name="capturingDelay3"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="Cam3EnableDisable">Camera 3 Enable:</label>
+                <input
+                  type="text"
+                  id="Cam3EnableDisable"
+                  name="Cam3EnableDisable"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="div5">
+        <div class="Station4">
+          <h3>Station 4</h3>
+
+          <div class="Station4Settings">
+            <div class="Station4div1">
+              <div class="inputs">
+                <label for="cameraHeight4">Camera Vertical Moment:</label>
+                <input
+                  type="text"
+                  id="cameraHeight4"
+                  name="cameraHeight4"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="lightIntensity4">Light Intensity:</label>
+                <input
+                  type="text"
+                  id="lightIntensity4"
+                  name="lightIntensity4"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="cameraExposure4">Camera Exposure:</label>
+                <input
+                  type="text"
+                  id="cameraExposure4"
+                  name="cameraExposure4"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+
+            <div class="Station4div2">
+              <div class="inputs">
+                <label for="cameraGain4">Camera Gain:</label>
+                <input
+                  type="text"
+                  id="cameraGain4"
+                  name="cameraGain4"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="capturingDelay4">Capturing Delay:</label>
+                <input
+                  type="text"
+                  id="capturingDelay4"
+                  name="capturingDelay4"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+
+              <div class="inputs">
+                <label for="Cam4EnableDisable">Camera 4 Enable:</label>
+                <input
+                  type="text"
+                  id="Cam4EnableDisable"
+                  name="Cam4EnableDisable"
+                  oninput="ValidateNumber(event)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="middle3">
+      <div class="SpeedSettings">
+        <h3>Speed</h3>
+
+        <div class="speeds">
+          <div>
+            <label for="VibratorSpeed">Vibrator Speed:</label>
+            <input
+              type="text"
+              id="VibratorSpeed"
+              name="VibratorSpeed"
+              oninput="ValidateNumber(event)"
+            />
+          </div>
+
+          <div>
+            <label for="Conv1Speed">Conveyor 1 Speed:</label>
+
+            <input
+              type="text"
+              id="Conv1Speed"
+              name="Conv1Speed"
+              oninput="ValidateNumber(event)"
+            />
+          </div>
+
+          <div>
+            <label for="Conv2Speed">Conveyor 2 Speed:</label>
+
+            <input
+              type="text"
+              id="Conv2Speed"
+              name="Conv2Speed"
+              oninput="ValidateNumber(event)"
+            />
+          </div>
+
+          <div>
+            <label for="IndexingSpeed">Indexing Speed:</label>
+            <input
+              type="text"
+              id="IndexingSpeed"
+              name="IndexingSpeed"
+              oninput="ValidateNumber(event)"
+            />
+          </div>
+
+          <div>
+            <label for="PushPart">Part Push Speed:</label>
+            <input
+              type="text"
+              id="PushPartSpeed"
+              name="PushPartSpeed"
+              oninput="ValidateNumber(event)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="Save">
+    <button onclick="saveParameters()" type="submit" class="save-button">
+      Save
+    </button>
+  </div>
+</div>
+
+{% endblock body %}.

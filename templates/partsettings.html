@@ -1,0 +1,990 @@
+
+{% extends 'Base.html' %} {% block body %}
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        /* 🚫 Disable scrollbars */
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #f2f4f8;
+    }
+
+    .h3 {
+        font-size: 1.75rem;
+        margin: 0.5rem;
+        color: #333;
+    }
+
+    .parent {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        /* Fill the whole screen height */
+        overflow: hidden;
+        padding: 1rem;
+    }
+
+    .middle1,
+    .middle2 {
+        display: flex;
+        flex-direction: row;
+        gap: 1rem;
+        justify-content: center;
+        flex: 1;
+    }
+
+
+
+
+    /* Make station settings a grid with 3 columns */
+.Station1Settings,
+.Station2Settings,
+.Station3Settings,
+.Station4Settings {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 columns */
+    gap: 1rem; /* spacing between items */
+}
+
+/* Input group: label + input side by side */
+.inputs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* Labels smaller so they fit inline */
+.inputs label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap; /* keep text in one line */
+    flex: 1;
+}
+
+/* Inputs smaller width */
+.inputs input[type="text"],
+.inputs select {
+    flex: 1.2; /* take remaining space */
+    min-width: 6rem; /* shrink width */
+    padding: 0.3rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+
+
+
+
+
+
+
+    .Station1,
+    .Station2,
+    .Station3,
+    .Station4 {
+        background: #ffffff;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        padding: 1rem;
+        width: 100%;
+        overflow: auto;
+        /* Ensures inner scroll instead of page scroll */
+    }
+
+    .Station1 h3,
+    .Station2 h3,
+    .Station3 h3,
+    .Station4 h3 {
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: #1d3557;
+        border-bottom: 2px solid #457b9d;
+        padding-bottom: 5px;
+    }
+
+    .div1,
+    .div2,
+    .div3,
+    .div4,
+    .div5 {
+        height: auto;
+        width: 100%;
+        padding: 0.5rem;
+        flex: 1;
+    }
+
+
+
+    .Station1div1,
+    .Station2div1,
+    .Station3div1,
+    .Station4div1,
+    .Station1div2,
+    .Station2div2,
+    .Station3div2,
+    .Station4div2 {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+  
+
+    label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+    }
+
+    input[type="text"],
+    select {
+        padding: 0.5rem;
+        font-size: 0.95rem;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        outline: none;
+        transition: border-color 0.3s;
+        background: #f9f9f9;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+        border-color: #457b9d;
+        background-color: #fff;
+    }
+
+    select option {
+        text-transform: none;
+    }
+
+    .PartSelection {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3rem;
+        padding: 1rem 0;
+    }
+
+    .selectpart,
+    .selectsubpart {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .Save {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.5rem 2rem;
+    }
+
+    .save-button {
+        background-color: #1d3557;
+        width: 10rem;
+        color: white;
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .save-button:hover {
+        background-color: #457b9d;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .save-button:active {
+        background-color: #1d3557;
+        transform: scale(0.98);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .save-button:focus {
+        border: 2px solid #a8dadc;
+        box-shadow: 0 0 0 3px rgba(69, 123, 157, 0.5);
+    }
+
+    .SpeedSettings {
+        padding: 1rem;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 3px 9px rgba(0, 0, 0, 0.1);
+        margin: 1rem;
+    }
+
+    .speeds {
+        display: flex;
+        justify-content: space-evenly;
+        gap: 2rem;
+    }
+</style>
+
+
+<div>
+    <div class="parent">
+
+        <div class="div1">
+
+         <div class="PartSelection">
+    <div class="selectpart">
+        <label>Part</label>
+        <select id="selectpart" name="selectpart" onchange="fetchSubpartsForParts()">
+            <option value="">Select Part</option>
+            {% for part in parts %}
+            <option value="{{ part }}">{{ part }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="selectsubpart">
+        <label>SubPart</label>
+        <select id="selectsubpart" name="selectsubpart" onchange="fetchPythonParameters()">
+            <option value="">Select Subpart</option>
+            <!-- Subparts will be populated dynamically -->
+        </select>
+    </div>
+</div>
+
+
+        </div>
+
+        <div class="middle1">
+            <div class="div2">
+                <div class="Station1">
+                    <h3>Station 1</h3>
+
+                    <div class="Station1Settings">
+
+                        <div class="Station1div1">
+
+                            <div class="inputs">
+                                <label for="IDMIN">ID Min:</label>
+                                <input type="text" id="IDMIN" name="IDMIN" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="IDMAX">ID Max:</label>
+                                <input type="text" id="IDMAX" name="IDMAX" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="ODMIN">OD Min:</label>
+                                <input type="text" id="ODMIN" name="ODMIN" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="ODMAX">OD Max:</label>
+                                <input type="text" id="ODMAX" name="ODMAX" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="THRESHOLDID2">Threshold ID2:</label>
+                                <input type="text" id="THRESHOLDID2" name="THRESHOLDID2"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="THRESHOLDOD2">Threshold OD2:</label>
+                                <input type="text" id="THRESHOLDOD2" name="THRESHOLDOD2" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="THRESHOLDID3">Threshold ID3:</label>
+                                <input type="text" id="THRESHOLDID3" name="THRESHOLDID3"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+
+                            <div class="inputs">
+                                <label for="CAM1DELAY">Camera 1 Delay:</label>
+                                <input type="text" id="CAM1DELAY" name="CAM1DELAY" oninput="ValidateNumber(event)">
+                            </div>
+
+
+                        </div>
+
+                        <div class="Station1div2">
+
+                           
+                            <div class="inputs">
+                                <label for="CONCENTRICITY">Concentricity:</label>
+                                <input type="text" id="CONCENTRICITY" name="CONCENTRICITY"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="ORIFICEMIN">Orifice Min:</label>
+                                <input type="text" id="ORIFICEMIN" name="ORIFICEMIN" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="ORIFICEMAX">Orifice Max:</label>
+                                <input type="text" id="ORIFICEMAX" name="ORIFICEMAX" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="PIXELTOMICRON">Pixel to Micron:</label>
+                                <input type="text" id="PIXELTOMICRON" name="PIXELTOMICRON"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="PIXELTOMICRONID">Pixel to Micron for ID:</label>
+                                <input type="text" id="PIXELTOMICRON_ID" name="PIXELTOMICRON_ID"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="PIXELTOMICRONOD">Pixel to Micron for OD:</label>
+                                <input type="text" id="PIXELTOMICRON_OD" name="PIXELTOMICRON_OD" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="THRESHOLDOD3">Threshold OD3:</label>
+                                <input type="text" id="THRESHOLDOD3" name="THRESHOLDOD3" oninput="ValidateNumber(event)">
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+            </div>
+            <div class="div3">
+                <div class="Station2">
+                    <h3>Station 2</h3>
+
+                    <div class="Station2Settings">
+
+                        <div class="Station2div1">
+
+                            <div class="inputs">
+                                <label for="THICKNESSMIN">Thickness Min:</label>
+                                <input type="text" id="THICKNESSMIN" name="THICKNESSMIN"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                             <div class="inputs">
+                                <label for="MINTHRESH">Min Thresh:</label>
+                                <input type="text" id="MINTHRESH" name="MINTHRESH"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                              <div class="inputs">
+                                <label for="PIXELTOMICRON2">Pixel to Micron:</label>
+                                <input type="text" id="PIXELTOMICRON2" name="PIXELTOMICRON2"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+
+
+                        </div>
+
+                        <div class="Station2div2">
+
+                            
+                            <div class="inputs">
+                                <label for="THICKNESSMAX">Thickness Max:</label>
+                                <input type="text" id="THICKNESSMAX" name="THICKNESSMAX"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            
+
+                             <div class="inputs">
+                                <label for="MAXTHRESH">Max Thresh:</label>
+                                <input type="text" id="MAXTHRESH" name="MAXTHRESH"
+                                    oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="CAM2DELAY">Camera 2 Delay:</label>
+                                <input type="text" id="CAM2DELAY" name="CAM2DELAY" oninput="ValidateNumber(event)">
+                            </div>
+
+                           
+
+                          
+
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </div>
+
+        <div class="middle2">
+            <div class="div4">
+                <div class="Station3">
+                    <h3>Station 3</h3>
+
+                    <div class="Station3Settings">
+
+                        <div class="Station3div1">
+
+                                
+
+                                                    <div class="inputs">
+                               <label for="ID2_OFFSET">ID2 Offset:</label>
+                               <input type="text" id="ID2_OFFSET" name="ID2_OFFSET" oninput="ValidateNumber(event)">
+                           </div>
+
+
+                           <div class="inputs">
+                               <label for="HIGHLIGHT_SIZE">Highlight Size:</label>
+                               <input type="text" id="HIGHLIGHT_SIZE" name="HIGHLIGHT_SIZE" oninput="ValidateNumber(event)">
+                           </div>
+
+                           <div class="inputs">
+                               <label for="id_BURR_MIN_AREA">ID Burr Min Area:</label>
+                               <input type="text" id="id_BURR_MIN_AREA" name="id_BURR_MIN_AREA" oninput="ValidateNumber(event)">
+
+                           </div>
+
+
+
+
+                   
+                       
+                        
+
+                        <div class="inputs">
+                            <label for="min_id_area3">Min ID Area:</label>
+                            <input type="text" id="min_id_area3" name="min_id_area3" oninput="ValidateNumber(event)">
+                        </div>
+   
+                        <div class="inputs">
+                            <label for="max_id_area3">Max ID Area:</label>
+                            <input type="text" id="max_id_area3" name="max_id_area3" oninput="ValidateNumber(event)">
+                        </div>
+
+                 
+                        <div class="inputs">
+                            <label for="min_circularity3">min_circularity:</label>
+                            <input type="text" id="min_circularity3" name="min_circularity3" oninput="ValidateNumber(event)">
+                        </div>
+
+                        
+
+                        
+
+                         <div class="inputs">
+                            <label for="min_aspect_ratio3">min_aspect_ratio:</label>
+                            <input type="text" id="min_aspect_ratio3" name="min_aspect_ratio3" oninput="ValidateNumber(event)">
+                        </div>
+
+
+                        <div class="inputs">
+                            <label for="CAM3DELAY">Camera 3 Delay:</label>
+                            <input type="text" id="CAM3DELAY" name="CAM3DELAY" oninput="ValidateNumber(event)">
+                        </div>
+
+                        <div class="inputs">
+                            <label for="ID2_OFFSET_OD3">ID2 Offset OD:</label>
+                            <input type="text" id="ID2_OFFSET_OD3" name="ID2_OFFSET_OD3" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="HIGHLIGHT_SIZE_OD3">Highlight Size OD:</label>
+                            <input type="text" id="HIGHLIGHT_SIZE_OD3" name="HIGHLIGHT_SIZE_OD3" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MIN_AREA3">OD Burr Min Area:</label>
+                            <input type="text" id="OD_BURR_MIN_AREA3" name="OD_BURR_MIN_AREA3" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MAX_AREA3">OD Burr Max Area:</label>
+                            <input type="text" id="OD_BURR_MAX_AREA3" name="OD_BURR_MAX_AREA3" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MIN_PERIMETER3">OD Burr Min Perimeter:</label>
+                            <input type="text" id="OD_BURR_MIN_PERIMETER3" name="OD_BURR_MIN_PERIMETER3" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MAX_PERIMETER3">OD Burr Max Perimeter:</label>
+                            <input type="text" id="OD_BURR_MAX_PERIMETER3" name="OD_BURR_MAX_PERIMETER3" oninput="ValidateNumber(event)">
+                        </div>
+
+
+                        
+
+
+
+
+
+
+
+
+<!-- 
+                            <div class="inputs">
+                                <label for="burr">Burr:</label>
+                                <input type="text" id="BURR3" name="BURR3" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="PIXELTOMICRON3">Pixel to Micron:</label>
+                                <input type="text" id="PIXELTOMICRON3" name="PIXELTOMICRON3"
+                                    oninput="ValidateNumber(event)">
+                            </div> -->
+
+
+                        </div>
+
+
+                        <div class="Station3div2">
+                           
+
+                               
+
+                           <div class="inputs">
+                               <label for="id_BURR_MAX_AREA">ID Burr Max Area:</label>
+                               <input type="text" id="id_BURR_MAX_AREA" name="id_BURR_MAX_AREA" oninput="ValidateNumber(event)">
+   
+                            </div>
+
+
+                             <div class="inputs">
+                                 <label for="id_BURR_MIN_PERIMETER">ID Burr Min Perimeter:</label>
+                                 <input type="text" id="id_BURR_MIN_PERIMETER" name="id_BURR_MIN_PERIMETER" oninput="ValidateNumber(event)">
+                             </div>
+
+                             <div class="inputs">
+                                 <label for="id_BURR_MAX_PERIMETER">ID Burr Max Perimeter:</label>
+                                 <input type="text" id="id_BURR_MAX_PERIMETER" name="id_BURR_MAX_PERIMETER" oninput="ValidateNumber(event)">
+                             </div>
+
+
+
+
+                            <div class="inputs">
+                                <label for="min_od_area3">Min OD Area:</label>
+                                <input type="text" id="min_od_area3" name="min_od_area3" oninput="ValidateNumber(event)">
+                            </div>
+
+                            <div class="inputs">
+                                <label for="max_od_area3">Max OD Area:</label>
+                                <input type="text" id="max_od_area3" name="max_od_area3" oninput="ValidateNumber(event)">
+                            </div>
+
+
+                             <div class="inputs">
+                            <label for="max_circularity3">min_circularity:</label>
+                            <input type="text" id="max_circularity3" name="max_circularity3" oninput="ValidateNumber(event)">
+                        </div>
+
+                          <div class="inputs">
+                            <label for="max_aspect_ratio3">max_aspect_ratio:</label>
+                            <input type="text" id="max_aspect_ratio3" name="max_aspect_ratio3" oninput="ValidateNumber(event)">
+                        </div>
+
+                       
+
+
+
+                        </div>
+
+
+
+                      
+
+
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="div5">
+                <div class="Station4">
+                    <h3>Station 4</h3>
+
+                    <div class="Station4Settings">
+
+                        <div class="Station4div1">
+
+                          <div class="inputs">
+            <label for="ID4_OFFSET">ID4 Offset:</label>
+            <input type="text" id="ID4_OFFSET" name="ID4_OFFSET" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="HIGHLIGHT_SIZE4">Highlight Size:</label>
+            <input type="text" id="HIGHLIGHT_SIZE4" name="HIGHLIGHT_SIZE4" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="id_BURR_MIN_AREA4">ID Burr Min Area:</label>
+            <input type="text" id="id_BURR_MIN_AREA4" name="id_BURR_MIN_AREA4" oninput="ValidateNumber(event)">
+        </div>
+
+
+
+        <div class="inputs">
+            <label for="min_id_area4">Min ID Area:</label>
+            <input type="text" id="min_id_area4" name="min_id_area4" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="max_id_area4">Max ID Area:</label>
+            <input type="text" id="max_id_area4" name="max_id_area4" oninput="ValidateNumber(event)">
+        </div>
+
+           <div class="inputs">
+                            <label for="max_circularity4">max_circularity:</label>
+                            <input type="text" id="max_circularity4" name="max_circularity4" oninput="ValidateNumber(event)">
+                        </div>
+
+                         <div class="inputs">
+                            <label for="max_aspect_ratio4">max_aspect_ratio:</label>
+                            <input type="text" id="max_aspect_ratio4" name="max_aspect_ratio4" oninput="ValidateNumber(event)">
+                        </div>
+
+                        <div class="inputs">
+                            <label for="CAM4DELAY">Camera 4 Delay:</label>
+                            <input type="text" id="CAM4DELAY" name="CAM4DELAY" oninput="ValidateNumber(event)">
+                        </div>
+
+                        <div class="inputs">
+                            <label for="ID4_OFFSET_OD">ID4 Offset OD:</label>
+                            <input type="text" id="ID4_OFFSET_OD" name="ID4_OFFSET_OD" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="HIGHLIGHT_SIZE_OD4">Highlight Size OD:</label>
+                            <input type="text" id="HIGHLIGHT_SIZE_OD4" name="HIGHLIGHT_SIZE_OD4" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MIN_AREA4">OD Burr Min Area:</label>
+                            <input type="text" id="OD_BURR_MIN_AREA4" name="OD_BURR_MIN_AREA4" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MAX_AREA4">OD Burr Max Area:</label>
+                            <input type="text" id="OD_BURR_MAX_AREA4" name="OD_BURR_MAX_AREA4" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MIN_PERIMETER4">OD Burr Min Perimeter:</label>
+                            <input type="text" id="OD_BURR_MIN_PERIMETER4" name="OD_BURR_MIN_PERIMETER4" oninput="ValidateNumber(event)">
+                        </div>
+                        <div class="inputs">
+                            <label for="OD_BURR_MAX_PERIMETER4">OD Burr Max Perimeter:</label>
+                            <input type="text" id="OD_BURR_MAX_PERIMETER4" name="OD_BURR_MAX_PERIMETER4" oninput="ValidateNumber(event)">
+                        </div>
+                        
+                        
+
+
+
+                        </div>
+
+                        <div class="Station4div2">
+
+
+                             <div class="inputs">
+            <label for="id_BURR_MAX_AREA4">ID Burr Max Area:</label>
+            <input type="text" id="id_BURR_MAX_AREA4" name="id_BURR_MAX_AREA4" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="id_BURR_MIN_PERIMETER4">ID Burr Min Perimeter:</label>
+            <input type="text" id="id_BURR_MIN_PERIMETER4" name="id_BURR_MIN_PERIMETER4" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="id_BURR_MAX_PERIMETER4">ID Burr Max Perimeter:</label>
+            <input type="text" id="id_BURR_MAX_PERIMETER4" name="id_BURR_MAX_PERIMETER4" oninput="ValidateNumber(event)">
+        </div>
+
+
+        <div class="inputs">
+            <label for="min_od_area4">Min OD Area:</label>  
+            <input type="text" id="min_od_area4" name="min_od_area4" oninput="ValidateNumber(event)">
+        </div>
+
+        <div class="inputs">
+            <label for="max_od_area4">Max OD Area:</label>
+            <input type="text" id="max_od_area4" name="max_od_area4" oninput="ValidateNumber(event)">
+        </div>
+
+                     
+
+                         <div class="inputs">
+                            <label for="min_circularity4">min_circularity:</label>
+                            <input type="text" id="min_circularity4" name="min_circularity4" oninput="ValidateNumber(event)">
+                        </div>
+
+                         <div class="inputs">
+                            <label for="min_aspect_ratio4">min_aspect_ratio:</label>
+                            <input type="text" id="min_aspect_ratio4" name="min_aspect_ratio4" oninput="ValidateNumber(event)">
+                        </div>
+
+                        
+
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="Save">
+            <button onclick="savePythonParameters()" type="submit" class="save-button">
+                Save
+            </button>
+        </div>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+<script>
+    
+function fetchSubpartsForParts() {
+    const selectedPart = document.getElementById('selectpart').value;
+    const subpartSelect = document.getElementById('selectsubpart');
+    
+    // Clear existing subpart options
+    subpartSelect.innerHTML = '<option value="">Select Subpart</option>';
+    
+    if (selectedPart) {
+        fetch('/get_subparts_parts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({part: selectedPart})
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Populate subpart dropdown with filtered results
+            data.subparts.forEach(subpart => {
+                const option = document.createElement('option');
+                option.value = subpart;
+                option.textContent = subpart;
+                subpartSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching subparts:', error);
+        });
+    }
+}
+
+    function ValidateNumber(event) {
+        let value = event.target.value;
+        value = value.replace(/[^0-9.]/g, '');
+        const parts = value.split('.');
+        if (parts.length > 2) {
+            value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        event.target.value = value;
+    }
+
+
+    function savePythonParameters() {
+    const part = document.getElementById("selectpart").value;
+    const subpart = document.getElementById("selectsubpart").value;
+
+    const parameters = [
+        // Station S1
+        { Station: "S1", Parameter: "IDMIN", Value: document.getElementById("IDMIN").value },
+        { Station: "S1", Parameter: "IDMAX", Value: document.getElementById("IDMAX").value },
+        { Station: "S1", Parameter: "ODMIN", Value: document.getElementById("ODMIN").value },
+        { Station: "S1", Parameter: "ODMAX", Value: document.getElementById("ODMAX").value },
+        { Station: "S1", Parameter: "THRESHOLDID2", Value: document.getElementById("THRESHOLDID2").value },
+        { Station: "S1", Parameter: "THRESHOLDOD2", Value: document.getElementById("THRESHOLDOD2").value },
+        { Station: "S1", Parameter: "THRESHOLDID3", Value: document.getElementById("THRESHOLDID3").value },
+        { Station: "S1", Parameter: "THRESHOLDOD3", Value: document.getElementById("THRESHOLDOD3").value },
+        { Station: "S1", Parameter: "CONCENTRICITY", Value: document.getElementById("CONCENTRICITY").value },
+        { Station: "S1", Parameter: "ORIFICEMIN", Value: document.getElementById("ORIFICEMIN").value },
+        { Station: "S1", Parameter: "ORIFICEMAX", Value: document.getElementById("ORIFICEMAX").value },
+        { Station: "S1", Parameter: "PIXELTOMICRON", Value: document.getElementById("PIXELTOMICRON").value },
+        { Station: "S1", Parameter: "PIXELTOMICRON_ID", Value: document.getElementById("PIXELTOMICRON_ID").value },
+        { Station: "S1", Parameter: "PIXELTOMICRON_OD", Value: document.getElementById("PIXELTOMICRON_OD").value },
+        { Station: "S1", Parameter: "CAM1DELAY", Value: document.getElementById("CAM1DELAY").value },
+
+        // Station S2
+        { Station: "S2", Parameter: "THICKNESSMIN", Value: document.getElementById("THICKNESSMIN").value },
+        { Station: "S2", Parameter: "THICKNESSMAX", Value: document.getElementById("THICKNESSMAX").value },
+        { Station: "S2", Parameter: "MINTHRESH", Value: document.getElementById("MINTHRESH").value },
+        { Station: "S2", Parameter: "MAXTHRESH", Value: document.getElementById("MAXTHRESH").value },
+        { Station: "S2", Parameter: "PIXELTOMICRON", Value: document.getElementById("PIXELTOMICRON2").value },
+        { Station: "S2", Parameter: "CAM2DELAY", Value: document.getElementById("CAM2DELAY").value },
+
+        // Station S3
+       // { Station: "S3", Parameter: "BURR", Value: document.getElementById("BURR3").value },
+       // { Station: "S3", Parameter: "PIXELTOMICRON", Value: document.getElementById("PIXELTOMICRON3").value },
+        
+        { Station: "S3", Parameter: "ID2_OFFSET", Value: document.getElementById("ID2_OFFSET").value },
+        { Station: "S3", Parameter: "HIGHLIGHT_SIZE", Value: document.getElementById("HIGHLIGHT_SIZE").value },
+        { Station: "S3", Parameter: "id_BURR_MIN_AREA", Value: document.getElementById("id_BURR_MIN_AREA").value },
+        { Station: "S3", Parameter: "id_BURR_MAX_AREA", Value: document.getElementById("id_BURR_MAX_AREA").value },
+        { Station: "S3", Parameter: "id_BURR_MIN_PERIMETER", Value: document.getElementById("id_BURR_MIN_PERIMETER").value },
+        { Station: "S3", Parameter: "id_BURR_MAX_PERIMETER", Value: document.getElementById("id_BURR_MAX_PERIMETER").value },
+        { Station: "S3", Parameter: "min_id_area3", Value: document.getElementById("min_id_area3").value },
+        { Station: "S3", Parameter: "max_id_area3", Value: document.getElementById("max_id_area3").value },
+        { Station: "S3", Parameter: "min_od_area3", Value: document.getElementById("min_od_area3").value },
+        { Station: "S3", Parameter: "max_od_area3", Value: document.getElementById("max_od_area3").value },
+        { Station: "S3", Parameter: "max_circularity3", Value: document.getElementById("max_circularity3").value },
+        { Station: "S3", Parameter: "min_circularity3", Value: document.getElementById("min_circularity3").value },
+        { Station: "S3", Parameter: "min_aspect_ratio3", Value: document.getElementById("min_aspect_ratio3").value },
+        { Station: "S3", Parameter: "max_aspect_ratio3", Value: document.getElementById("max_aspect_ratio3").value },
+        { Station: "S3", Parameter: "CAM3DELAY", Value: document.getElementById("CAM3DELAY").value },
+        { Station: "S3", Parameter: "ID2_OFFSET_OD3", Value: document.getElementById("ID2_OFFSET_OD3").value },
+        { Station: "S3", Parameter: "HIGHLIGHT_SIZE_OD3", Value: document.getElementById("HIGHLIGHT_SIZE_OD3").value },
+        { Station: "S3", Parameter: "OD_BURR_MIN_AREA3", Value: document.getElementById("OD_BURR_MIN_AREA3").value },
+        { Station: "S3", Parameter: "OD_BURR_MAX_AREA3", Value: document.getElementById("OD_BURR_MAX_AREA3").value },
+        { Station: "S3", Parameter: "OD_BURR_MIN_PERIMETER3", Value: document.getElementById("OD_BURR_MIN_PERIMETER3").value },
+        { Station: "S3", Parameter: "OD_BURR_MAX_PERIMETER3", Value: document.getElementById("OD_BURR_MAX_PERIMETER3").value },
+
+
+
+
+         // Station S4
+       // { Station: "S4", Parameter: "BURR", Value: document.getElementById("BURR4").value },
+        //{ Station: "S4", Parameter: "PIXELTOMICRON", Value: document.getElementById("PIXELTOMICRON4").value },
+         { Station: "S4", Parameter: "ID4_OFFSET", Value: document.getElementById("ID4_OFFSET").value },
+         { Station: "S4", Parameter: "HIGHLIGHT_SIZE", Value: document.getElementById("HIGHLIGHT_SIZE4").value },
+         { Station: "S4", Parameter: "id_BURR_MIN_AREA", Value: document.getElementById("id_BURR_MIN_AREA4").value },
+         { Station: "S4", Parameter: "id_BURR_MAX_AREA", Value: document.getElementById("id_BURR_MAX_AREA4").value },
+         { Station: "S4", Parameter: "id_BURR_MIN_PERIMETER", Value: document.getElementById("id_BURR_MIN_PERIMETER4").value },
+         { Station: "S4", Parameter: "id_BURR_MAX_PERIMETER", Value: document.getElementById("id_BURR_MAX_PERIMETER4").value },
+         { Station: "S4", Parameter: "min_id_area4", Value: document.getElementById("min_id_area4").value },
+         { Station: "S4", Parameter: "max_id_area4", Value: document.getElementById("max_id_area4").value },
+         { Station: "S4", Parameter: "min_od_area4", Value: document.getElementById("min_od_area4").value },
+         { Station: "S4", Parameter: "max_od_area4", Value: document.getElementById("max_od_area4").value },           
+         { Station: "S4", Parameter: "max_circularity4", Value: document.getElementById("max_circularity4").value },
+         { Station: "S4", Parameter: "min_circularity4", Value: document.getElementById("min_circularity4").value },
+         { Station: "S4", Parameter: "min_aspect_ratio4", Value: document.getElementById("min_aspect_ratio4").value },
+         { Station: "S4", Parameter: "max_aspect_ratio4", Value: document.getElementById("max_aspect_ratio4").value },
+         { Station: "S4", Parameter: "CAM4DELAY", Value: document.getElementById("CAM4DELAY").value },
+         { Station: "S4", Parameter: "ID4_OFFSET_OD4", Value: document.getElementById("ID4_OFFSET_OD").value },
+         { Station: "S4", Parameter: "HIGHLIGHT_SIZE_OD4", Value: document.getElementById("HIGHLIGHT_SIZE_OD4").value },
+         { Station: "S4", Parameter: "OD_BURR_MIN_AREA4", Value: document.getElementById("OD_BURR_MIN_AREA4").value },
+         { Station: "S4", Parameter: "OD_BURR_MAX_AREA4", Value: document.getElementById("OD_BURR_MAX_AREA4").value },
+         { Station: "S4", Parameter: "OD_BURR_MIN_PERIMETER4", Value: document.getElementById("OD_BURR_MIN_PERIMETER4").value },
+         { Station: "S4", Parameter: "OD_BURR_MAX_PERIMETER4", Value: document.getElementById("OD_BURR_MAX_PERIMETER4").value },
+
+    ];
+
+    fetch("/update_python_parameters", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ part, subpart, parameters })
+    })
+        .then(response => {
+            if (response.ok) {
+                alert("Python parameters saved successfully!");
+            } else {
+                alert("Failed to save python parameters.");
+            }
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("Error occurred while saving python parameters.");
+        });
+}
+
+    function fetchPythonParameters() {
+        const part = document.getElementById('selectpart').value;
+        const subpart = document.getElementById('selectsubpart').value;
+
+        if (part && subpart) {
+            fetch('/get_python_parameters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ part, subpart })
+            })
+                .then(response => response.json())
+                .then(data => populatePythonInputs(data));
+        }
+    }
+
+   function populatePythonInputs(data) {
+    document.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
+
+    data.forEach(param => {
+        const station = param.Station;
+        const key = param.Parameter;
+        const value = param.Value;
+
+        if (station === "S1" && key === "PIXELTOMICRON_ID") {
+            document.getElementById("PIXELTOMICRON_ID").value = value;
+        } else if (station === "S1" && key === "PIXELTOMICRON") {
+            document.getElementById("PIXELTOMICRON").value = value;                   
+        } else if (station === "S1" && key === "PIXELTOMICRON_OD") {
+            document.getElementById("PIXELTOMICRON_OD").value = value;
+        } else if (station === "S2" && key === "PIXELTOMICRON") {
+            document.getElementById("PIXELTOMICRON2").value = value;
+
+        } else if (station === "S3" && key === "ID2_OFFSET") {
+            document.getElementById("ID2_OFFSET").value = value;
+        } else if (station === "S3" && key === "HIGHLIGHT_SIZE") {
+            document.getElementById("HIGHLIGHT_SIZE").value = value;
+        } else if (station === "S3" && key === "id_BURR_MIN_AREA") {
+            document.getElementById("id_BURR_MIN_AREA").value = value;
+        } else if (station === "S3" && key === "id_BURR_MAX_AREA") {
+            document.getElementById("id_BURR_MAX_AREA").value = value;
+        } else if (station === "S3" && key === "id_BURR_MIN_PERIMETER") {
+            document.getElementById("id_BURR_MIN_PERIMETER").value = value;
+        } else if (station === "S3" && key === "id_BURR_MAX_PERIMETER") {
+            document.getElementById("id_BURR_MAX_PERIMETER").value = value;
+        } else if (station === "S4" && key === "ID4_OFFSET") {
+            document.getElementById("ID4_OFFSET").value = value;
+        } else if (station === "S4" && key === "HIGHLIGHT_SIZE") {
+            document.getElementById("HIGHLIGHT_SIZE4").value = value;
+        } else if (station === "S4" && key === "id_BURR_MIN_AREA") {
+            document.getElementById("id_BURR_MIN_AREA4").value = value;
+        } else if (station === "S4" && key === "id_BURR_MAX_AREA") {
+            document.getElementById("id_BURR_MAX_AREA4").value = value;
+        } else if (station === "S4" && key === "id_BURR_MIN_PERIMETER") {
+            document.getElementById("id_BURR_MIN_PERIMETER4").value = value;
+        } else if (station === "S4" && key === "id_BURR_MAX_PERIMETER") {
+            document.getElementById("id_BURR_MAX_PERIMETER4").value = value;
+        // } else if (station === "S3" && key === "PIXELTOMICRON") {
+        //     document.getElementById("PIXELTOMICRON3").value = value;
+        // } else if (station === "S4" && key === "PIXELTOMICRON") {
+        //     document.getElementById("PIXELTOMICRON4").value = value;
+        // } else if (station === "S3" && key === "BURR") {
+        //       document.getElementById("BURR3").value = value;
+        // } else if (station === "S4" && key === "BURR") {
+        //       document.getElementById("BURR4").value = value;
+        } else {
+            const input = document.getElementById(key);
+            if (input) input.value = value;
+        }
+    });
+}
+
+
+</script>
+
+
+{% endblock body %}.
