@@ -1307,7 +1307,8 @@ function fetchSubpartsForHome() {
 
         const imgElement = document.querySelector(`#${camId} img`);
         if (imgElement) {
-            imgElement.src = `/static/OutputImages/${camId}output/${camId}_bmp.bmp?v=${Date.now()}`;
+            // D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam1output
+            imgElement.src = `/images/${camId}output/${camId}_bmp.bmp?v=${Date.now()}`;
             imgElement.style.display = 'block';
             console.log(`🖼️ Displaying black & white image for ${camId}`);
         }

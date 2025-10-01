@@ -21,6 +21,36 @@ def uniq_parts(recipe_rows):
 def subparts_for(part, recipe_rows):
     return sorted({r['Subpart_name'] for r in (recipe_rows or []) if r['Part_name'] == part})
 
+from flask import abort, send_from_directory
+from werkzeug.utils import safe_join
+import os
+
+OUTPUT_ROOT = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages"
+
+@app.route('/images/<cam_id>/<path:filename>')
+def images(cam_id, filename):
+    allowed = {"cam1output", "cam2output", "cam3output", "cam4output"}
+    if cam_id not in allowed:
+        abort(404)
+
+    directory = safe_join(OUTPUT_ROOT, cam_id)
+
+    # Optional: guard for missing file (helps you see 404s instead of 500s)
+    full_path = safe_join(directory, filename)
+    if not os.path.isfile(full_path):
+        abort(404)
+
+    # Werkzeug ≥3: use max_age (cache_timeout removed)
+    try:
+        resp = send_from_directory(directory, filename, max_age=0)
+    except TypeError:
+        # Old Werkzeug fallback
+        resp = send_from_directory(directory, filename)
+
+    # Strong no-cache headers so your ?v=... works reliably
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 

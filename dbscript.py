@@ -9,7 +9,7 @@ import data as dt
 # ----------------------------
 conn_str = (
     r"DRIVER={ODBC Driver 17 for SQL Server};"
-    r"SERVER=DESKTOP-1GT7A0J\SQLEXPRESS;"
+    r"SERVER=DESKTOP-3C651IK\SQLEXPRESS;"
     r"DATABASE=Pravi_DB;"
     r"Trusted_Connection=yes;"
     r"Encrypt=no;"
@@ -19,7 +19,7 @@ conn_str = (
 # Connection string WITHOUT database for initial check
 server_conn_str = (
     r"DRIVER={ODBC Driver 17 for SQL Server};"
-    r"SERVER=DESKTOP-1GT7A0J\SQLEXPRESS;"
+    r"SERVER=DESKTOP-3C651IK\SQLEXPRESS;"
     r"Trusted_Connection=yes;"
     r"Encrypt=no;"
     r"TrustServerCertificate=yes;"

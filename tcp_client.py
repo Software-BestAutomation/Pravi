@@ -40,7 +40,7 @@ station_result_queues = {
     "C4": St4,
 }
 
-CONTROLLER_IP = "192.168.31.80" #192.168.31.36  192.168.0.104
+CONTROLLER_IP = "192.168.0.104" #192.168.31.36  192.168.0.104
 CONTROLLER_PORT = 8888
 timeout = 5
 
@@ -239,7 +239,7 @@ def communicate_with_controller(param_dict):
 
                 if "C1" in data:
                     print("✅ C1 received — starting processing")
-                    delay_time = 1 # add in data.py
+                    delay_time = 0.8 # add in data.py
                     if delay_time > 0:
                         print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
                         time.sleep(delay_time)
