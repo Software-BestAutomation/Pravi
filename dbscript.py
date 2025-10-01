@@ -560,18 +560,26 @@ def insert_workpartdetail_1st_Station(
     bottom_cam_error_description,
     supplier_name,
     invoice_no,
-) -> None:
+) -> int | None:
+    """
+    Inserts a Work_Part_Detail row and returns the generated S_No (identity).
+    Returns None if the insert fails.
+    """
     try:
         with pyodbc.connect(conn_str) as conn:
             cur = conn.cursor()
+
+            # Insert the row
             cur.execute(
                 """
                 INSERT INTO dbo.Work_Part_Detail (
                     Date_time, Part_Name, Subpart_Name, Part_ID, Current_Station,
-                    ID, OD, Orifice, Concentricity, Dimension_Cam_Image, Dimension_Result, Dimension_Cam_Error_Description,
+                    ID, OD, Orifice, Concentricity,
+                    Dimension_Cam_Image, Dimension_Result, Dimension_Cam_Error_Description,
                     Thickness_Cam_Image, Thickness_Result, Thickness_Cam_Error_Description,
                     TopBurr_Cam_Image, TopBurr_Result, TopBurr_Cam_Error_Description,
-                    Bottom_Cam_Image, Bottom_Result, Bottom_Cam_Error_Description, Supplier_Name, Invoice_No
+                    Bottom_Cam_Image, Bottom_Result, Bottom_Cam_Error_Description,
+                    Supplier_Name, Invoice_No
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -601,10 +609,18 @@ def insert_workpartdetail_1st_Station(
                     invoice_no,
                 ),
             )
+
+            # Fetch the identity of the row we just inserted
+            cur.execute("SELECT CAST(SCOPE_IDENTITY() AS INT)")
+            s_no_row = cur.fetchone()
+            s_no = int(s_no_row[0]) if s_no_row and s_no_row[0] is not None else None
+
             conn.commit()
-            print("Record inserted successfully.")
+            print("Record inserted successfully. S_No:", s_no)
+            return s_no
     except Exception as ex:
         print(f"Error while inserting data: {ex}")
+        return None
 
 def update_workpartdetail_2nd_Station(s_no, current_station, result, thickness_error) -> None:
     try:

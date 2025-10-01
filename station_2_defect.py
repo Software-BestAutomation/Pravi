@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 import imutils
 
-def preprocess_image(frame, output_folder=None, min_thresh=0, max_thresh=255):
+def preprocess_image(frame, output_folder=None, min_thresh=50, max_thresh=255):
     # Preprocess the image: create folder, grayscale, threshold, find and filter contours
     """Preprocessing function for image loading, thresholding, and contour detection"""
     if output_folder:
@@ -29,14 +29,15 @@ def preprocess_image(frame, output_folder=None, min_thresh=0, max_thresh=255):
         max_thr = 255
     
     # Inverse binary threshold so darker objects become white blobs (foreground)
+    print('Min Thr:',min_thr,'max  thr:',max_thr)
     _, thresh_img = cv2.threshold(gray, min_thr, max_thr, cv2.THRESH_BINARY_INV)
     
     # Detect external contours on the binary image (ignore holes/children)
     contours, _ = cv2.findContours(thresh_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     # Define ROI rectangle; keep contours whose bounding box lies fully inside
-    rect_x1, rect_y1 = 660, 600      # SUPPORT PISTON 780 SPACER 600
-    rect_x2, rect_y2 = 1560, 960
+    rect_x1, rect_y1 = 500, 600      # SUPPORT PISTON 780 SPACER 600
+    rect_x2, rect_y2 = 1600, 950
     
     # Collect contours fully contained in the ROI to reject outside noise
     filtered_contours = []

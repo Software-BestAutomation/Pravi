@@ -6,9 +6,11 @@ import numpy as np
 import os 
 from PIL import Image
 
-def main(part, subpart, frame, thick_min, thick_max, pixel_to_micron, output_folder, min_thresh=None, max_thresh=None):
+def main(part, subpart, frame, thick_min, thick_max, pixel_to_micron, output_folder, min_thresh=50, max_thresh=255):
     # Check if part is in the excluded list
     excluded_parts = ["PISTON", "GUIDE END", "SEPARATING PISTON", "NRV SEAL"]
+
+    print(f"Part: {part}, SubPart: {subpart}, frame: {frame}, Thick_min:{thick_min}, thick_max: {thick_max}, pixel_to_micron: {pixel_to_micron}, output_folder: {output_folder}, min_thresh: {min_thresh}, max_thresh: {max_thresh}")
     
     if part in excluded_parts:
         # For excluded parts, return NA values for all outputs without processing
@@ -67,9 +69,11 @@ def main(part, subpart, frame, thick_min, thick_max, pixel_to_micron, output_fol
         # Parse and validate threshold parameters
         try:
             if min_thresh in (None, "NA", ""):
+                print('Min thresh none passing it as 100')
                 min_thr = 100
             else:
                 min_thr = int(float(min_thresh))
+                print('min  thresh taken from else:',min_thr)
             min_thr = max(0, min(255, min_thr))  # clamp to valid 8-bit range
             
             if max_thresh in (None, "NA", ""):

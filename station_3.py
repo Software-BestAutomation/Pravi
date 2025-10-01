@@ -13,16 +13,22 @@ def _parse_num(val, typ):
     return typ(val)
 
 def main(part, subpart, frame,
-         # ID parameters
          ID2_OFFSET_ID, HIGHLIGHT_SIZE_ID,
          ID_BURR_MIN_AREA, ID_BURR_MAX_AREA, ID_BURR_MIN_PERIMETER, ID_BURR_MAX_PERIMETER,
-         # OD parameters
          ID2_OFFSET_OD, HIGHLIGHT_SIZE_OD,
          OD_BURR_MIN_AREA, OD_BURR_MAX_AREA, OD_BURR_MIN_PERIMETER, OD_BURR_MAX_PERIMETER,
-         # Contour selection
          min_id_area, max_id_area, min_od_area, max_od_area,
          min_circularity, max_circularity, min_aspect_ratio, max_aspect_ratio,
          output_folder):
+
+    # 🔹 Print all argument names & values
+    print("========== Arguments Passed ==========")
+    for name, val in locals().items():
+        if name != "frame":  # frame might be an image array, too large to print
+            print(f"{name}: {val}")
+        else:
+            print(f"{name}: <image/frame of shape {getattr(frame, 'shape', 'unknown')}>")
+    print("======================================")
 
     try:
         id_offset = _parse_num(ID2_OFFSET_ID, int)

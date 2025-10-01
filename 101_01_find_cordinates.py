@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 #image_path = "trials\\bg_removed_img_gray_IMG_20240215_170211564.png"
-image_path = r"D:\PIM_15-09-25\Pravi_Flask\static\Cam1InputImages\image0000562.bmp"
+image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam2.bmp"
 brown_ring_image = cv2.imread(image_path)
 
 # Display the image using matplotlib

@@ -7,23 +7,23 @@ import os
 
 # ==== Load Test Image ====
 #image_path = r"D:\Pravi\burr_images\new_glass\station4\dataset\5_9_25\VCXG.2-32C\image0000504.bmp"
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\image0000497.bmp"
+image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam2.bmp"
 #D:\PIM_15-09-25\Pravi_Flask\static\Cam1InputImages
 
 frame = cv2.imread(image_path)
 
 # ==== Parameters ====
-part = "O RING"
-subpart = "28.10.039"
-thick_min = "2.30"          # Example minimum thickness in mm
-thick_max = "2.70"          # Example maximum thickness in mm
+part = "SUPPORT PISTON"
+subpart = "28.10.019"
+thick_min = "0.01"          # Example minimum thickness in mm
+thick_max = "5.70"          # Example maximum thickness in mm
 pixel_to_micron = "44"      # Example conversion factor (microns per pixel)
 
 # Force save location for cam2 image as requested
 output_folder = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output"
 
 # New threshold parameters for software control
-min_thresh = "70"           # Threshold value (can be changed by software) 60
+min_thresh = "50"           # Threshold value (can be changed by software) 60
 max_thresh = "255"          # Maximum value for thresholding (can be changed by software)
 
 # ==== Call the main() Function ====

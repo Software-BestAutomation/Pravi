@@ -45,7 +45,7 @@ def camera_connect3():
 def camera_connect4():
     try:
         camera4.Connect('700009600797') #700009600797 fixed camera ID
-        camera4.f.ExposureTime.Set(8000)
+        camera4.f.ExposureTime.Set(5000)
         print('Camera 4 Connected!')
         return True
     except (neoapi.NeoException, Exception) as exc:

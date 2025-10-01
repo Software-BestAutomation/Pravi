@@ -7,7 +7,7 @@ import cv2
 import os
 
 # Load test image
-image_path = r"D:\PIM_15-09-25\Pravi_Flask\static\Cam1InputImages\image0000494.bmp"
+image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam3.bmp"
 frame = cv2.imread(image_path)
 print(f"DEBUG: Loaded image from: {image_path}")
 
