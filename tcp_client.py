@@ -48,7 +48,7 @@ timeout = 5
 keep_running = True
 
 global sock
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock = None  # set when connected inside communicate_with_controller
 OutputFolder1 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam1output"
 OutputFolder2 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam2output"
 OutputFolder3 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam3output"
@@ -58,6 +58,65 @@ BackUpOutputFolder1 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam1outp
 BackUpOutputFolder2 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output\cam2_output_backup"
 BackUpOutputFolder3 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam3output\cam3_output_backup"
 BackUpOutputFolder4 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam4output\cam4_output_backup"
+
+
+# Add near other globals
+sock_lock = threading.Lock()
+
+def send_until_ack(sock, cmd: str, ack_token: str, *,
+                   timeout_per_try: float = 1.0,
+                   resend_every: float = 0.25,
+                   max_wait: float | None = None) -> bool:
+    """
+    Keep sending `cmd` until we see `ack_token` in the rx stream.
+    Returns True when ACK is seen, False if `keep_running` goes False or max_wait exceeded.
+
+    Notes:
+    - Uses a lock so other threads don't interleave on the same socket.
+    - Resends every `resend_every` seconds while waiting up to `timeout_per_try` for each try.
+    - If `max_wait` is None, it will retry indefinitely (until keep_running turns False).
+    """
+    global keep_running
+    end_time = time.time() + max_wait if max_wait else None
+
+    with sock_lock:
+        while keep_running and (end_time is None or time.time() < end_time):
+            try:
+                # Send once
+                if not cmd.endswith("\r\n"):
+                    wire = (cmd + "\r\n").encode()
+                else:
+                    wire = cmd.encode()
+                print(f"📤 Sending {cmd.strip()} (expect {ack_token})")
+                sock.sendall(wire)
+
+                # Try to receive ack within timeout_per_try
+                start_try = time.time()
+                buffer = ""
+                while keep_running and (time.time() - start_try) < timeout_per_try:
+                    try:
+                        data = sock.recv(1024).decode(errors="ignore")
+                        if not data:
+                            # peer closed
+                            break
+                        buffer += data
+                        if ack_token in buffer:
+                            print(f"✅ ACK matched: {ack_token}")
+                            return True
+                    except socket.timeout:
+                        # keep looping this try
+                        continue
+                    except Exception as e:
+                        print(f"❌ recv error while waiting for {ack_token}: {e}")
+                        break  # exit inner; we will resend
+            except Exception as e:
+                print(f"❌ send error for {cmd.strip()}: {e}")
+
+            # No ack this try: short delay before resending
+            time.sleep(resend_every)
+
+    print(f"⚠️ send_until_ack aborted for {cmd.strip()} (stopped or timed out)")
+    return False
 
 
 def _get_delay_for_station(n: int) -> float:
@@ -191,16 +250,15 @@ def communicate_with_controller(param_dict):
         "C3": str(param_dict.get("S3:Camera3Enable", "1")) == "1",
         "C4": str(param_dict.get("S4:Camera4Enable", "1")) == "1",
     }
-
     active_stations = [c for c in ["C1", "C2", "C3", "C4"] if enabled[c]]
     print(f"🔧 Active stations: {active_stations}")
 
-    # Clear queues
-    for queue_obj in station_result_queues.values():
-        while not queue_obj.empty():
+    # Clear per-station result queues
+    for q in station_result_queues.values():
+        while not q.empty():
             try:
-                queue_obj.get_nowait()
-            except:
+                q.get_nowait()
+            except Exception:
                 break
 
     try:
@@ -208,91 +266,134 @@ def communicate_with_controller(param_dict):
             sock.settimeout(timeout)
             sock.connect((CONTROLLER_IP, CONTROLLER_PORT))
             print("✅ Connected to controller.")
+            globals()['sock'] = sock  # expose connected socket to other functions/threads
 
+            # === Step 1: Build & send init commands (retry until ACK) ===
             command_list = build_command_sequence(param_dict)
-
-            # === Step 1: Send commands and wait for ACK ===
             for command, ack in command_list:
-                # print(f"📤 Sending command: {command.strip()}")
-                ack_received = False
-                while not ack_received:
-                    sock.sendall((command + "\r\n").encode())
-                    time.sleep(0.5)
-                    print(f"Sending {command} to controller")
-                    try:
-                        start_time = time.time()
-                        buffer = ""
-                        while time.time() - start_time < timeout:
-                            try:
-                                data = sock.recv(1024).decode()
-                                buffer += data
-                                if ack in buffer:
-                                    ack_received = True
-                                    # print(
-                                    #     f"✅ Received ACK for {command.strip()}: {data.strip()}"
-                                    # )
-                                    break
-                            except socket.timeout:
-                                continue
-                    except Exception as e:
-                        print(f"❌ Error sending {command}: {e}")
-                        break
-                time.sleep(0.005)  # Slight delay before next command
-
+                ok = send_until_ack(
+                    sock,
+                    command,
+                    ack_token=ack,
+                    timeout_per_try=timeout,
+                    resend_every=0.2
+                )
+                if not ok:
+                    print(f"❌ Failed to get ACK for {command.strip()} — aborting start.")
+                    return
             print("✅ All commands acknowledged.")
 
-            # === Step 2: Send $STR# until $ACK_STR is received ===
-            ack_received = False
+            # === Step 2: Start request ($STR#) with retry-until-ACK ===
             print("📤 Sending $STR# to start process")
-            while not ack_received:
-                sock.sendall("$STR#\r\n".encode())
-                try:
-                    start_time = time.time()
-                    buffer = ""
-                    while time.time() - start_time < timeout:
-                        try:
-                            data = sock.recv(1024).decode()
-                            buffer += data
-                            if "ACK_STR" in buffer:
-                                ack_received = True
-                                print("✅ Received $ACK_STR")
-                                break
-                        except socket.timeout:
-                            continue
-                except Exception as e:
-                    print(f"❌ Error sending $STR#: {e}")
-
-                time.sleep(0.05)
+            if not send_until_ack(
+                sock,
+                "$STR#",
+                "$ACK_STR#",
+                timeout_per_try=timeout,
+                resend_every=0.2
+            ):
+                print("❌ Could not get $ACK_STR# — aborting.")
+                return
+            print("✅ Received $ACK_STR")
 
             # === Step 3: Connect Cameras ===
             print("🔗 Connecting cameras...")
             ConnectCam(param_dict)
 
-            # === Step 4: Wait for C1 trigger ===
+            # === Step 4: Main receive loop ===
             while keep_running:
                 try:
-                    data = sock.recv(1024).decode().strip()
-                    print(f"📥 Received: {data}")
+                    with sock_lock:
+                        data = sock.recv(1024).decode(errors="ignore")
                 except socket.timeout:
                     continue
                 except Exception as e:
                     print(f"❌ Error receiving data: {e}")
                     break
 
-                if "C1" in data:
-                    print("✅ C1 received — starting processing")
-                    print("Debugging starts here")
+                if not data:
+                    continue
+                data = data.strip()
+                if not data:
+                    continue
+                print(f"📥 Received: {data}")
 
-                    # Use the same helper you already wrote to read delays (supports CAM1DELAY or Delay_Cam1)
-                    delay_time = 0.8
+                # Controller -> UI triggers and commands
+                if "$C1#" in data:
+                    # ACK back to controller (your spec does NOT require "ACK of ACK")
+                    try:
+                        sock.sendall("$ACK_C1#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_C1#: {e}")
+                    print("✅ C1 received — starting processing")
+
+                    # Optional short pre-delay before starting your sequential process
+                    delay_time = 0.8  # keep your chosen initial delay before the sequence
                     if delay_time > 0:
                         print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
                         time.sleep(delay_time)
 
                     threading.Thread(
-                        target=run_sequential_process, args=(active_stations, sock)
+                        target=run_sequential_process,
+                        args=(active_stations, sock),
+                        daemon=True
                     ).start()
+                    continue
 
+                if "$C2#" in data:
+                    try:
+                        sock.sendall("$ACK_C2#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_C2#: {e}")
+                    # (If you ever decide to start cam2 directly, do it here)
+                    continue
+
+                if "$C3#" in data:
+                    try:
+                        sock.sendall("$ACK_C3#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_C3#: {e}")
+                    continue
+
+                if "$C4#" in data:
+                    try:
+                        sock.sendall("$ACK_C4#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_C4#: {e}")
+                    continue
+
+                if "$STR#" in data:
+                    # Start coming from hardware; acknowledge and (optionally) trigger your flow
+                    try:
+                        sock.sendall("$ACK_STR#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_STR#: {e}")
+                    # If you want hardware STR to auto-start too, you could kick off here.
+                    continue
+
+                if "$STP#" in data:
+                    try:
+                        sock.sendall("$ACK_STP#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_STP#: {e}")
+                    keep_running = False
+                    cs.camera_disconnect()
+                    print("🛑 Stop received from controller.")
+                    break
+
+                if "$OK_BIN_FULL#" in data:
+                    try:
+                        sock.sendall("$ACK_OK_BIN_FULL#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_OK_BIN_FULL#: {e}")
+                    continue
+
+                if "$NOK_BIN_FULL#" in data:
+                    try:
+                        sock.sendall("$ACK_NOK_BIN_FULL#\r\n".encode())
+                    except Exception as e:
+                        print(f"❌ Failed to send $ACK_NOK_BIN_FULL#: {e}")
+                    continue
 
     except Exception as e:
         print(f"❌ Error in communicate_with_controller: {e}")
@@ -310,28 +411,21 @@ def stop_process():
             sock.connect((CONTROLLER_IP, CONTROLLER_PORT))
             print("🛑 Connected to controller for STOP command.")
 
-            ack_received = False
             print("📤 Sending STP to controller")
-            while not ack_received:
-                sock.sendall("$STP#\r\n".encode())
-                try:
-                    start_time = time.time()
-                    buffer = ""
-                    while time.time() - start_time < timeout:
-                        try:
-                            data = sock.recv(1024).decode()
-                            buffer += data
-                            if "$ACK_STP#" in buffer:
-                                ack_received = True
-                                print("✅ Received ACK_STP")
-                                cs.camera_disconnect()
-                                break
-                        except socket.timeout:
-                            continue
-                except Exception as e:
-                    print(f"❌ Error sending STP: {e}")
+            ok = send_until_ack(
+                sock,
+                "$STP#",
+                "$ACK_STP#",
+                timeout_per_try=timeout,
+                resend_every=0.2,
+                max_wait=5*timeout
+            )
+            if ok:
+                print("✅ Received ACK_STP")
+            else:
+                print("⚠️ No ACK_STP received; proceeding to disconnect cameras anyway.")
+            cs.camera_disconnect()
 
-                time.sleep(0.05)
 
     except Exception as e:
         print(f"❌ Error in stop_process: {e}")
@@ -767,19 +861,27 @@ def ReadPythonResult(cam_id, station, active_stations):
         # Final OK/NOK only if C4 is the last active station
         if station == active_stations[-1]:
             try:
-                total_delay = (
-                    dt.python_parameters.get("Delay_Cam1", 0)
-                    + dt.python_parameters.get("Delay_Cam2", 0)
-                    + dt.python_parameters.get("Delay_Cam3", 0)
-                    + dt.python_parameters.get("Delay_Cam4", 0)
-                )
+                total_delay = sum(_get_delay_for_station(i) for i in (1, 2, 3, 4))
                 print(f"⏳ Waiting {total_delay} sec before sending final result")
-                time.sleep(total_delay)
+                if total_delay > 0:
+                    time.sleep(total_delay)
 
-                code = "$OK#\r\n" if result_ok else "$NOK#\r\n"
+                code = "$OK#" if result_ok else "$NOK#"
                 DB.update_defect_count("OK" if result_ok else "NOK")
-                sock.sendall(code.encode())
-                print(f"Sent: {code.strip()}")
+                ack_token = "$ACK_" + code.strip("$#") + "#"
+                ok = send_until_ack(
+                    sock,
+                    code,
+                    ack_token,
+                    timeout_per_try=timeout,
+                    resend_every=0.2,
+                    max_wait=5*timeout
+                )
+                if ok:
+                    print(f"Sent: {code} (ACK received)")
+                else:
+                    print(f"⚠️ Sent: {code} (no ACK)")
+
             except Exception as e:
                 print(f"❌ Error sending final result: {e}")
     # 3️⃣ FIXED: Put result in current station's queue
@@ -899,8 +1001,16 @@ def run_sequential_process(active_stations, sock):
                         )
                         time.sleep(total_delay)
 
-                        sock.sendall("$NOK#\r\n".encode())
-                        print("Sent: $NOK# (due to earlier NOK)")
+                        ok = send_until_ack(
+                            sock,
+                            "$NOK#",
+                            "$ACK_NOK#",
+                            timeout_per_try=timeout,
+                            resend_every=0.2,
+                            max_wait=5*timeout
+                        )
+                        print("Sent: $NOK# (due to earlier NOK)" + (" [ACK]" if ok else " [no ACK]"))
+
                     except Exception as e:
                         print(f"❌ Error sending NOK: {e}")
                 continue
