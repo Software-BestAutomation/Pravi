@@ -34,6 +34,8 @@
 # python contour_area.py --image D:\PIM_15-09-25\Pravi_Flask\static\Cam1InputImages\cam4.bmp
 
 # python contour_area.py --image D:\PIM_15-09-25\Pravi_Flask\static\Cam1InputImages\cam3.bmp
+
+# python contour_area.py --image "D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam4.bmp"
 import cv2
 import numpy as np
 import sys
@@ -62,7 +64,7 @@ def draw_contours(img):
     # cv2.drawContours(contour_img, [sorted_contours[0]], -1, (255, 0, 0), 2)  # sky blue
     # cv2.drawContours(contour_img, [sorted_contours[1]], -1, (0, 255, 0), 2)  # yellow
     cv2.drawContours(contour_img, [sorted_contours[2]], -1, (0, 0, 255), 2)  # yellow
-    cv2.drawContours(contour_img, [sorted_contours[3]], -1, (255, 0, 0), 2)  # sky blue
+    # cv2.drawContours(contour_img, [sorted_contours[3]], -1, (255, 0, 0), 2)  # sky blue
     cv2.drawContours(contour_img, [sorted_contours[4]], -1, (0, 255, 0), 2)  # yellow
     # cv2.drawContours(contour_img, [sorted_contours[5]], -1, (0, 0, 255), 2)  # yellow
     # cv2.drawContours(contour_img, [sorted_contours[6]], -1, (255, 0, 0), 2)  # sky blue

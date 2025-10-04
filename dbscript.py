@@ -25,6 +25,8 @@ server_conn_str = (
     r"TrustServerCertificate=yes;"
 )
 
+
+
 # ----------------------------
 # One-time DB / table setup
 # ----------------------------
@@ -419,9 +421,9 @@ def load_python_parameters(recipe_id: str) -> None:
                 (recipe_id,),
             )
             for station, param, value in cur.fetchall():
-                if station in dt.python_parameters and param in dt.python_parameters[station]:
+                if station in dt.python_parameters:
                     dt.python_parameters[station][param] = value
-                    print(f"Loaded {station} - {param}: {value}")
+                    # print(f"Loaded {station} - {param}: {value}")
     except Exception as e:
         print(f"❌ Error loading parameters: {e}")
 

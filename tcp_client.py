@@ -40,7 +40,7 @@ station_result_queues = {
     "C4": St4,
 }
 
-CONTROLLER_IP = "10.165.127.133"  # 192.168.31.36  192.168.0.104
+CONTROLLER_IP = "192.168.0.104"  # 192.168.31.36        controller IP 192.168.0.104
 CONTROLLER_PORT = 8888
 timeout = 5
 
@@ -53,6 +53,24 @@ OutputFolder1 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam1outpu
 OutputFolder2 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam2output"
 OutputFolder3 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam3output"
 OutputFolder4 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam4output"
+
+BackUpOutputFolder1 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam1output\cam1_output_backup"
+BackUpOutputFolder2 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output\cam2_output_backup"
+BackUpOutputFolder3 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam3output\cam3_output_backup"
+BackUpOutputFolder4 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam4output\cam4_output_backup"
+
+
+def _get_delay_for_station(n: int) -> float:
+    smap = dt.python_parameters.get(f"S{n}", {}) or {}
+    raw = (
+        smap.get(f"CAM{n}DELAY")
+        or smap.get(f"Delay_Cam{n}")
+        or 0
+    )
+    try:
+        return float(raw)
+    except Exception:
+        return 0.0
 
 
 def build_command_sequence(param_dict):
@@ -195,10 +213,12 @@ def communicate_with_controller(param_dict):
 
             # === Step 1: Send commands and wait for ACK ===
             for command, ack in command_list:
-                print(f"📤 Sending command: {command.strip()}")
+                # print(f"📤 Sending command: {command.strip()}")
                 ack_received = False
                 while not ack_received:
                     sock.sendall((command + "\r\n").encode())
+                    time.sleep(0.5)
+                    print(f"Sending {command} to controller")
                     try:
                         start_time = time.time()
                         buffer = ""
@@ -208,9 +228,9 @@ def communicate_with_controller(param_dict):
                                 buffer += data
                                 if ack in buffer:
                                     ack_received = True
-                                    print(
-                                        f"✅ Received ACK for {command.strip()}: {data.strip()}"
-                                    )
+                                    # print(
+                                    #     f"✅ Received ACK for {command.strip()}: {data.strip()}"
+                                    # )
                                     break
                             except socket.timeout:
                                 continue
@@ -261,15 +281,18 @@ def communicate_with_controller(param_dict):
 
                 if "C1" in data:
                     print("✅ C1 received — starting processing")
-                    delay_time = 0.8  # add in data.py
+                    print("Debugging starts here")
+
+                    # Use the same helper you already wrote to read delays (supports CAM1DELAY or Delay_Cam1)
+                    delay_time = 0.8
                     if delay_time > 0:
-                        print(
-                            f"⏳ Waiting {delay_time} sec before triggering sequential process..."
-                        )
+                        print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
                         time.sleep(delay_time)
+
                     threading.Thread(
                         target=run_sequential_process, args=(active_stations, sock)
                     ).start()
+
 
     except Exception as e:
         print(f"❌ Error in communicate_with_controller: {e}")
@@ -439,6 +462,7 @@ def ReadPythonResult(cam_id, station, active_stations):
             pixel_to_micron_id=params["PIXELTOMICRON_ID"],
             pixel_to_micron_od=params["PIXELTOMICRON_OD"],
             output_folder=OutputFolder1,
+            backup_output_folder=BackUpOutputFolder1
         )
         part = dt.StaticData["PartName"]
         subpart = dt.StaticData["SubPartName"]
@@ -524,7 +548,11 @@ def ReadPythonResult(cam_id, station, active_stations):
             thick_max=dt.python_parameters["S2"]["THICKNESSMAX"],
             pixel_to_micron=dt.python_parameters["S2"]["PIXELTOMICRON"],
             output_folder=OutputFolder2,
+            min_thresh = dt.python_parameters["S2"]["MINTHRESH"],
+            max_thresh = dt.python_parameters["S2"]["MAXTHRESH"],
+            backup_output_folder=BackUpOutputFolder2
         )
+        
 
         print(
             f"Station 2 ResultType: {resultType}, Result: {result}, "
@@ -610,6 +638,7 @@ def ReadPythonResult(cam_id, station, active_stations):
             max_aspect_ratio=dt.python_parameters["S3"]["max_aspect_ratio3"],
 
             output_folder=OutputFolder3,
+            backup_output_folder = BackUpOutputFolder3
         )
 
         # res is a dict per your new station3.py
@@ -691,6 +720,7 @@ def ReadPythonResult(cam_id, station, active_stations):
             max_aspect_ratio=dt.python_parameters["S4"]["max_aspect_ratio4"],
 
             output_folder=OutputFolder4,
+            backup_output_folder = BackUpOutputFolder4
         )
 
         # Expect the same dict shape as station3.py
@@ -806,6 +836,19 @@ def run_sequential_process(active_stations, sock):
     for i, station in enumerate(active_stations):
         cam_id = f"cam{station[-1]}"
 
+        # ⛳️ DEBUG: show raw delay values (from per-station dicts) and computed floats
+        print("DEBUG raw delay keys:",
+              "S1", dt.python_parameters.get("S1", {}).get("CAM1DELAY") or dt.python_parameters.get("S1", {}).get("Delay_Cam1"),
+              "S2", dt.python_parameters.get("S2", {}).get("CAM2DELAY") or dt.python_parameters.get("S2", {}).get("Delay_Cam2"),
+              "S3", dt.python_parameters.get("S3", {}).get("CAM3DELAY") or dt.python_parameters.get("S3", {}).get("Delay_Cam3"),
+              "S4", dt.python_parameters.get("S4", {}).get("CAM4DELAY") or dt.python_parameters.get("S4", {}).get("Delay_Cam4"))
+        print("DEBUG computed delays:",
+              "S1", _get_delay_for_station(1),
+              "S2", _get_delay_for_station(2),
+              "S3", _get_delay_for_station(3),
+              "S4", _get_delay_for_station(4))
+
+
         # Skip disabled cameras
         if not getattr(cs, f"isConnectedCamera{station[-1]}")():
             print(f"⚠️ {cam_id.upper()} is disabled. Passing OK to next stage.")
@@ -814,10 +857,11 @@ def run_sequential_process(active_stations, sock):
 
         # If not first camera, wait for delay
         if station != "C1":
-            delay_key = f"Delay_Cam{station[-1]}"
-            delay_time = dt.python_parameters.get(delay_key, 0) or 0
+            delay_time = _get_delay_for_station(int(station[-1]))
             print(f"⏳ Waiting {delay_time} sec before {station}")
-            time.sleep(delay_time)
+            if delay_time > 0:
+                time.sleep(delay_time)
+
 
             # Check previous station result
             prev_station = active_stations[i - 1]
@@ -830,8 +874,7 @@ def run_sequential_process(active_stations, sock):
 
             if not ok:
                 # Still respect this station's configured delay before skipping
-                delay_key = f"Delay_Cam{station[-1]}"
-                delay_time = dt.python_parameters.get(delay_key, 0) or 0
+                delay_time = _get_delay_for_station(int(station[-1]))
                 if delay_time > 0:
                     print(
                         f"⏳ Waiting {delay_time} sec before skipping {station} due to earlier NOK"
@@ -844,12 +887,13 @@ def run_sequential_process(active_stations, sock):
                 # If this was the last station, immediately notify controller
                 if station == active_stations[-1]:
                     try:
-                        total_delay = (
-                            dt.python_parameters.get("Delay_Cam1", 0)
-                            + dt.python_parameters.get("Delay_Cam2", 0)
-                            + dt.python_parameters.get("Delay_Cam3", 0)
-                            + dt.python_parameters.get("Delay_Cam4", 0)
-                        )
+                        print(dt.python_parameters.get("Delay_Cam1"))
+                        print(dt.python_parameters.get("Delay_Cam2"))
+                        print(dt.python_parameters.get("Delay_Cam3"))
+                        print(dt.python_parameters.get("Delay_Cam4"))
+                        
+
+                        total_delay = sum(_get_delay_for_station(i) for i in (1,2,3,4))
                         print(
                             f"⏳ Waiting {total_delay} sec before sending final NOK (due to earlier NOK)"
                         )

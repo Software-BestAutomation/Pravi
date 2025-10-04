@@ -99,7 +99,7 @@ def get_station_parameters_route():
     if recipe_id:
         parameters = dbscript.get_station_parameters(recipe_id)
         print(f"Part: {part}, Subpart: {subpart}, Recipe ID: {recipe_id}")
-        print("Parameters:", parameters)
+        # print("Parameters:", parameters)
 
         return jsonify(parameters)
     else:
@@ -380,7 +380,7 @@ def get_python_parameters():
     if recipe_id:
         parameters = dbscript.get_python_parameters(recipe_id)
         print(f"Fetched Python Parameters for Part: {part}, Subpart: {subpart}, RecipeID: {recipe_id}")
-        print("Parameters:", parameters)
+        # print("Parameters:", parameters)
         return jsonify(parameters)
     else:
         return jsonify([]), 404
@@ -424,6 +424,7 @@ def start_sequence():
     # Step 2: Get Parameters for that Recipe
     raw_param_dict = dbscript.get_parameters_for_recipe(recipe_id)
     data.StaticData["PartID"] = recipe_id
+    dbscript.load_python_parameters(recipe_id)
     # print(recipe_id)
 
     # ✅ Step 2.5: Clean up the keys (strip extra spaces)
