@@ -4,6 +4,8 @@ import time
 import CameraConnection as cs
 import dbscript as DB
 import requests
+import queue
+import cv2
 import station1 as Station1_detection
 import station2 as Station2_detection
 import station_3 as Station3_detection
@@ -14,6 +16,10 @@ import data as dt
 
 from queue import Queue
 
+import cv2
+import numpy as np
+import os
+from PIL import Image
 
 Cam1frame = None
 image2 = None
@@ -41,44 +47,6 @@ timeout = 5
 # Global control flag
 keep_running = True
 
-
-# Wall-clock "now" helper (seconds since epoch)
-def _now() -> float:
-    return time.time()
-
-def wait_until(deadline: float):
-    """
-    Busy-wait until wall-clock `deadline` (in seconds since epoch) or until
-    `keep_running` is cleared. NO sleep() used (CPU will spin).
-    """
-    while keep_running and _now() < deadline:
-        # pure spin; no sleep() by request
-        pass
-
-def wait_for(seconds: float):
-    """
-    Busy-wait for `seconds` duration using wall-clock time.
-    Clamps negatives to 0 and keeps cancellation via `keep_running`.
-    """
-    try:
-        sec = max(0.0, float(seconds))
-    except Exception:
-        sec = 0.0
-    wait_until(_now() + sec)
-
-def spin_for(seconds: float):
-    """Small utility for resend/pacing loops (also no sleep())."""
-    try:
-        sec = max(0.0, float(seconds))
-    except Exception:
-        sec = 0.0
-    deadline = _now() + sec
-    while keep_running and _now() < deadline:
-        pass
-
-
-
-
 global sock
 sock = None  # set when connected inside communicate_with_controller
 OutputFolder1 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam1output"
@@ -99,40 +67,68 @@ def send_until_ack(sock, cmd: str, ack_token: str, *,
                    timeout_per_try: float = 1.0,
                    resend_every: float = 0.25,
                    max_wait: float | None = None) -> bool:
+    """
+    Keep sending `cmd` until we see `ack_token` in the rx stream.
+    Returns True when ACK is seen, False if `keep_running` goes False or max_wait exceeded.
+
+    Notes:
+    - Uses a lock so other threads don't interleave on the same socket.
+    - Resends every `resend_every` seconds while waiting up to `timeout_per_try` for each try.
+    - If `max_wait` is None, it will retry indefinitely (until keep_running turns False).
+    """
     global keep_running
-    end_time = (_now() + max_wait) if max_wait else None
+    end_time = time.time() + max_wait if max_wait else None
 
     with sock_lock:
-        while keep_running and (end_time is None or _now() < end_time):
+        while keep_running and (end_time is None or time.time() < end_time):
             try:
-                wire = (cmd if cmd.endswith("\r\n") else cmd + "\r\n").encode()
+                # Send once
+                if not cmd.endswith("\r\n"):
+                    wire = (cmd + "\r\n").encode()
+                else:
+                    wire = cmd.encode()
                 print(f"📤 Sending {cmd.strip()} (expect {ack_token})")
                 sock.sendall(wire)
 
-                start_try = _now()
+                # Try to receive ack within timeout_per_try
+                start_try = time.time()
                 buffer = ""
-                while keep_running and (_now() - start_try) < timeout_per_try:
+                while keep_running and (time.time() - start_try) < timeout_per_try:
                     try:
                         data = sock.recv(1024).decode(errors="ignore")
                         if not data:
+                            # peer closed
                             break
                         buffer += data
                         if ack_token in buffer:
                             print(f"✅ ACK matched: {ack_token}")
                             return True
                     except socket.timeout:
+                        # keep looping this try
                         continue
                     except Exception as e:
                         print(f"❌ recv error while waiting for {ack_token}: {e}")
-                        break
+                        break  # exit inner; we will resend
             except Exception as e:
                 print(f"❌ send error for {cmd.strip()}: {e}")
 
-            # No ack this try → wait before resending WITHOUT sleep()
-            spin_for(resend_every)
+            # No ack this try: short delay before resending
+            time.sleep(resend_every)
 
     print(f"⚠️ send_until_ack aborted for {cmd.strip()} (stopped or timed out)")
     return False
+
+# add near globals
+stop_event = threading.Event()
+
+def wait_until(deadline_monotonic: float):
+    """Sleep in small chunks so we can exit early when STOP arrives."""
+    while keep_running and not stop_event.is_set():
+        remaining = deadline_monotonic - time.monotonic()
+        if remaining <= 0:
+            return
+        # sleep in small slices so STOP can interrupt quickly
+        time.sleep(min(remaining, 0.05))
 
 
 def _get_delay_for_station(n: int) -> float:
@@ -146,6 +142,16 @@ def _get_delay_for_station(n: int) -> float:
         return float(raw)
     except Exception:
         return 0.0
+    
+    
+def _delays():
+    # seconds as floats; S1 is usually 0 (first station)
+    return (
+        _get_delay_for_station(1),
+        _get_delay_for_station(2),
+        _get_delay_for_station(3),
+        _get_delay_for_station(4),
+    )
 
 
 def build_command_sequence(param_dict):
@@ -286,7 +292,6 @@ def communicate_with_controller(param_dict):
 
             # === Step 1: Build & send init commands (retry until ACK) ===
             command_list = build_command_sequence(param_dict)
-            print(f"command_list: {command_list}")
             for command, ack in command_list:
                 ok = send_until_ack(
                     sock,
@@ -345,11 +350,13 @@ def communicate_with_controller(param_dict):
                     print("✅ C1 received — starting processing")
 
                     # Optional short pre-delay before starting your sequential process
-                    delay_time = 0.8  # keep your chosen initial delay before the sequence
+                    delay_time = 0.8
                     if delay_time > 0:
                         print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
-                        wait_for(delay_time)
-
+                        wait_until(time.monotonic() + delay_time)
+                        if not keep_running or stop_event.is_set():
+                            continue
+                    stop_event.clear()
                     threading.Thread(
                         target=run_sequential_process,
                         args=(active_stations, sock),
@@ -393,6 +400,7 @@ def communicate_with_controller(param_dict):
                         sock.sendall("$ACK_STP#\r\n".encode())
                     except Exception as e:
                         print(f"❌ Failed to send $ACK_STP#: {e}")
+                    stop_event.set()
                     keep_running = False
                     cs.camera_disconnect()
                     print("🛑 Stop received from controller.")
@@ -418,7 +426,6 @@ def communicate_with_controller(param_dict):
 
 def stop_process():
     global sock, keep_running
-
     print("🛑 Stop requested")
 
     # 1) Try to send STP on the existing session first
@@ -455,6 +462,7 @@ def stop_process():
             print(f"❌ Fallback STP failed: {e}")
 
     # 3) Now stop local loops and disconnect cameras
+    stop_event.set()
     keep_running = False
     cs.camera_disconnect()
 
@@ -889,11 +897,6 @@ def ReadPythonResult(cam_id, station, active_stations):
         # Final OK/NOK only if C4 is the last active station
         if station == active_stations[-1]:
             try:
-                total_delay = sum(_get_delay_for_station(i) for i in (1, 2, 3, 4))
-                print(f"⏳ Waiting {total_delay} sec before sending final result")
-                if total_delay > 0:
-                    wait_for(total_delay)
-
                 code = "$OK#" if result_ok else "$NOK#"
                 DB.update_defect_count("OK" if result_ok else "NOK")
                 ack_token = "$ACK_" + code.strip("$#") + "#"
@@ -958,91 +961,96 @@ def safe_get(obj, key, default=0):
 
 def run_sequential_process(active_stations, sock):
     """
-    Runs C1–C4 sequentially:
-    - C1 trigger comes from controller
-    - C2–C4 follow with delays from data.py
+    Runs C1–C4 sequentially on an absolute schedule:
+      - Anchor at t0 (when this function starts after the C1 trigger)
+      - For C2..C4, start at cumulative absolute offsets:
+            C1: 0
+            C2: d2
+            C3: d2 + d3
+            C4: d2 + d3 + d4
+      where dN = _get_delay_for_station(N)
+    This avoids double-waiting and keeps timing precise.
     """
 
+    # Debug: raw + computed delays
+    print("DEBUG raw delay keys:",
+          "S1", dt.python_parameters.get("S1", {}).get("CAM1DELAY") or dt.python_parameters.get("S1", {}).get("Delay_Cam1"),
+          "S2", dt.python_parameters.get("S2", {}).get("CAM2DELAY") or dt.python_parameters.get("S2", {}).get("Delay_Cam2"),
+          "S3", dt.python_parameters.get("S3", {}).get("CAM3DELAY") or dt.python_parameters.get("S3", {}).get("Delay_Cam3"),
+          "S4", dt.python_parameters.get("S4", {}).get("CAM4DELAY") or dt.python_parameters.get("S4", {}).get("Delay_Cam4"))
+    print("DEBUG computed delays:",
+          "S1", _get_delay_for_station(1),
+          "S2", _get_delay_for_station(2),
+          "S3", _get_delay_for_station(3),
+          "S4", _get_delay_for_station(4))
+
+    # Build absolute schedule (offsets from t0)
+    # Semantics kept from your previous code: you did NOT wait before C1, only before C2..C4.
+    d2 = _get_delay_for_station(2)
+    d3 = _get_delay_for_station(3)
+    d4 = _get_delay_for_station(4)
+
+    # Build absolute schedule from active_stations only
+    absolute_offsets = {}
+    acc = 0.0
+    for idx, st in enumerate(active_stations):
+        if st == "C1":
+            absolute_offsets[st] = 0.0
+        else:
+            acc += _get_delay_for_station(int(st[-1]))
+            absolute_offsets[st] = acc
+
+    # Anchor time: right when we start the sequence
+    t0 = time.monotonic()
+
     for i, station in enumerate(active_stations):
+        if not keep_running:
+            print("⛔️ Aborted: keep_running is False")
+            return
+
         cam_id = f"cam{station[-1]}"
 
-        # ⛳️ DEBUG: show raw delay values (from per-station dicts) and computed floats
-        print("DEBUG raw delay keys:",
-              "S1", dt.python_parameters.get("S1", {}).get("CAM1DELAY") or dt.python_parameters.get("S1", {}).get("Delay_Cam1"),
-              "S2", dt.python_parameters.get("S2", {}).get("CAM2DELAY") or dt.python_parameters.get("S2", {}).get("Delay_Cam2"),
-              "S3", dt.python_parameters.get("S3", {}).get("CAM3DELAY") or dt.python_parameters.get("S3", {}).get("Delay_Cam3"),
-              "S4", dt.python_parameters.get("S4", {}).get("CAM4DELAY") or dt.python_parameters.get("S4", {}).get("Delay_Cam4"))
-        print("DEBUG computed delays:",
-              "S1", _get_delay_for_station(1),
-              "S2", _get_delay_for_station(2),
-              "S3", _get_delay_for_station(3),
-              "S4", _get_delay_for_station(4))
-
-
-        # Skip disabled cameras
+        # Skip disabled cameras (pass OK token forward so the chain can progress)
         if not getattr(cs, f"isConnectedCamera{station[-1]}")():
             print(f"⚠️ {cam_id.upper()} is disabled. Passing OK to next stage.")
             station_result_queues[station].put(True)
             continue
 
-        # If not first camera, wait for delay
-        if station != "C1":
-            delay_time = _get_delay_for_station(int(station[-1]))
-            print(f"⏳ Waiting {delay_time} sec before {station}")
-            if delay_time > 0:
-                wait_for(delay_time)
+        # Wait until the absolute time for this station (from t0)
+        offset = absolute_offsets.get(station, 0.0)
+        print(f"⏳ {station}: waiting until +{offset:.3f}s from start")
+        wait_until(t0 + offset)
+        if not keep_running or stop_event.is_set():
+            print("⛔️ Aborted during wait")
+            return
 
-
-            # Check previous station result
+        # For stations after the first, check previous station's result
+        if i > 0:
             prev_station = active_stations[i - 1]
             try:
-                ok = station_result_queues[prev_station].get(timeout=1)
-                print(f"📝 Got result from {prev_station}: {ok}")
+                # small, tight timeout to keep the schedule crisp
+                ok_prev = station_result_queues[prev_station].get(timeout=0.1)
+                print(f"📝 Got result from {prev_station}: {ok_prev}")
             except Exception as e:
-                print(f"❌ Error getting token from {prev_station}: {e}")
-                ok = False
+                print(f"❌ No timely token from {prev_station} (treat as NOK): {e}")
+                ok_prev = False
 
-            if not ok:
-                # Still respect this station's configured delay before skipping
-                delay_time = _get_delay_for_station(int(station[-1]))
-                if delay_time > 0:
-                    print(
-                        f"⏳ Waiting {delay_time} sec before skipping {station} due to earlier NOK"
-                    )
-                    wait_for(delay_time)
-
-                print(f"❌ Skipping {station} because previous stage was NOK")
+            if not ok_prev:
+                print(f"❌ Skipping {station} because previous stage {prev_station} was NOK")
                 station_result_queues[station].put(False)
 
-                # If this was the last station, immediately notify controller
+                # If this is the last active station, notify controller NOW (no extra delays)
                 if station == active_stations[-1]:
                     try:
-                        print(dt.python_parameters.get("Delay_Cam1"))
-                        print(dt.python_parameters.get("Delay_Cam2"))
-                        print(dt.python_parameters.get("Delay_Cam3"))
-                        print(dt.python_parameters.get("Delay_Cam4"))
-                        
-
-                        total_delay = sum(_get_delay_for_station(i) for i in (1,2,3,4))
-                        print(
-                            f"⏳ Waiting {total_delay} sec before sending final NOK (due to earlier NOK)"
-                        )
-                        wait_for(total_delay)
-
                         ok = send_until_ack(
-                            sock,
-                            "$NOK#",
-                            "$ACK_NOK#",
-                            timeout_per_try=timeout,
-                            resend_every=0.2,
-                            max_wait=5*timeout
+                            sock, "$NOK#", "$ACK_NOK#",
+                            timeout_per_try=timeout, resend_every=0.2, max_wait=5*timeout
                         )
                         print("Sent: $NOK# (due to earlier NOK)" + (" [ACK]" if ok else " [no ACK]"))
-
-                    except Exception as e:
-                        print(f"❌ Error sending NOK: {e}")
+                    except Exception as ex:
+                        print(f"❌ Error sending NOK: {ex}")
                 continue
 
-        # Run detection for this station
+        # Kick off this station’s capture/processing
         C_TriggeredProcess(cam_id, station, active_stations)
         print(f"✅ {station} processing started.")
