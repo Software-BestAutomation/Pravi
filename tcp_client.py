@@ -4,8 +4,6 @@ import time
 import CameraConnection as cs
 import dbscript as DB
 import requests
-import queue
-import cv2
 import station1 as Station1_detection
 import station2 as Station2_detection
 import station_3 as Station3_detection
@@ -16,10 +14,6 @@ import data as dt
 
 from queue import Queue
 
-import cv2
-import numpy as np
-import os
-from PIL import Image
 
 Cam1frame = None
 image2 = None
@@ -47,6 +41,44 @@ timeout = 5
 # Global control flag
 keep_running = True
 
+
+# Wall-clock "now" helper (seconds since epoch)
+def _now() -> float:
+    return time.time()
+
+def wait_until(deadline: float):
+    """
+    Busy-wait until wall-clock `deadline` (in seconds since epoch) or until
+    `keep_running` is cleared. NO sleep() used (CPU will spin).
+    """
+    while keep_running and _now() < deadline:
+        # pure spin; no sleep() by request
+        pass
+
+def wait_for(seconds: float):
+    """
+    Busy-wait for `seconds` duration using wall-clock time.
+    Clamps negatives to 0 and keeps cancellation via `keep_running`.
+    """
+    try:
+        sec = max(0.0, float(seconds))
+    except Exception:
+        sec = 0.0
+    wait_until(_now() + sec)
+
+def spin_for(seconds: float):
+    """Small utility for resend/pacing loops (also no sleep())."""
+    try:
+        sec = max(0.0, float(seconds))
+    except Exception:
+        sec = 0.0
+    deadline = _now() + sec
+    while keep_running and _now() < deadline:
+        pass
+
+
+
+
 global sock
 sock = None  # set when connected inside communicate_with_controller
 OutputFolder1 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam1output"
@@ -67,53 +99,37 @@ def send_until_ack(sock, cmd: str, ack_token: str, *,
                    timeout_per_try: float = 1.0,
                    resend_every: float = 0.25,
                    max_wait: float | None = None) -> bool:
-    """
-    Keep sending `cmd` until we see `ack_token` in the rx stream.
-    Returns True when ACK is seen, False if `keep_running` goes False or max_wait exceeded.
-
-    Notes:
-    - Uses a lock so other threads don't interleave on the same socket.
-    - Resends every `resend_every` seconds while waiting up to `timeout_per_try` for each try.
-    - If `max_wait` is None, it will retry indefinitely (until keep_running turns False).
-    """
     global keep_running
-    end_time = time.time() + max_wait if max_wait else None
+    end_time = (_now() + max_wait) if max_wait else None
 
     with sock_lock:
-        while keep_running and (end_time is None or time.time() < end_time):
+        while keep_running and (end_time is None or _now() < end_time):
             try:
-                # Send once
-                if not cmd.endswith("\r\n"):
-                    wire = (cmd + "\r\n").encode()
-                else:
-                    wire = cmd.encode()
+                wire = (cmd if cmd.endswith("\r\n") else cmd + "\r\n").encode()
                 print(f"📤 Sending {cmd.strip()} (expect {ack_token})")
                 sock.sendall(wire)
 
-                # Try to receive ack within timeout_per_try
-                start_try = time.time()
+                start_try = _now()
                 buffer = ""
-                while keep_running and (time.time() - start_try) < timeout_per_try:
+                while keep_running and (_now() - start_try) < timeout_per_try:
                     try:
                         data = sock.recv(1024).decode(errors="ignore")
                         if not data:
-                            # peer closed
                             break
                         buffer += data
                         if ack_token in buffer:
                             print(f"✅ ACK matched: {ack_token}")
                             return True
                     except socket.timeout:
-                        # keep looping this try
                         continue
                     except Exception as e:
                         print(f"❌ recv error while waiting for {ack_token}: {e}")
-                        break  # exit inner; we will resend
+                        break
             except Exception as e:
                 print(f"❌ send error for {cmd.strip()}: {e}")
 
-            # No ack this try: short delay before resending
-            time.sleep(resend_every)
+            # No ack this try → wait before resending WITHOUT sleep()
+            spin_for(resend_every)
 
     print(f"⚠️ send_until_ack aborted for {cmd.strip()} (stopped or timed out)")
     return False
@@ -270,6 +286,7 @@ def communicate_with_controller(param_dict):
 
             # === Step 1: Build & send init commands (retry until ACK) ===
             command_list = build_command_sequence(param_dict)
+            print(f"command_list: {command_list}")
             for command, ack in command_list:
                 ok = send_until_ack(
                     sock,
@@ -331,7 +348,7 @@ def communicate_with_controller(param_dict):
                     delay_time = 0.8  # keep your chosen initial delay before the sequence
                     if delay_time > 0:
                         print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
-                        time.sleep(delay_time)
+                        wait_for(delay_time)
 
                     threading.Thread(
                         target=run_sequential_process,
@@ -400,35 +417,46 @@ def communicate_with_controller(param_dict):
 
 
 def stop_process():
-    global sock
-    global keep_running
+    global sock, keep_running
 
-    keep_running = False  # Stop ongoing processes
+    print("🛑 Stop requested")
 
+    # 1) Try to send STP on the existing session first
+    sent_any = False
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(timeout)
-            sock.connect((CONTROLLER_IP, CONTROLLER_PORT))
-            print("🛑 Connected to controller for STOP command.")
-
-            print("📤 Sending STP to controller")
+        if sock is not None:
+            print("📨 Sending STP on existing session")
             ok = send_until_ack(
-                sock,
-                "$STP#",
-                "$ACK_STP#",
+                sock, "$STP#", "$ACK_STP#",
                 timeout_per_try=timeout,
                 resend_every=0.2,
                 max_wait=5*timeout
             )
-            if ok:
-                print("✅ Received ACK_STP")
-            else:
-                print("⚠️ No ACK_STP received; proceeding to disconnect cameras anyway.")
-            cs.camera_disconnect()
-
-
+            print("✅ Received ACK_STP" if ok else "⚠️ No ACK_STP on existing session")
+            sent_any = True
     except Exception as e:
-        print(f"❌ Error in stop_process: {e}")
+        print(f"❌ Error sending STP on existing session: {e}")
+
+    # 2) Optional fallback: new connection (only if needed by your PLC)
+    if not sent_any:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+                s2.settimeout(timeout)
+                s2.connect((CONTROLLER_IP, CONTROLLER_PORT))
+                print("🛑 Connected (fallback) to send STP")
+                ok = send_until_ack(
+                    s2, "$STP#", "$ACK_STP#",
+                    timeout_per_try=timeout,
+                    resend_every=0.2,
+                    max_wait=5*timeout
+                )
+                print("✅ Received ACK_STP (fallback)" if ok else "⚠️ No ACK_STP (fallback)")
+        except Exception as e:
+            print(f"❌ Fallback STP failed: {e}")
+
+    # 3) Now stop local loops and disconnect cameras
+    keep_running = False
+    cs.camera_disconnect()
 
 
 def C_TriggeredProcess(cam_id, station, active_stations):
@@ -864,7 +892,7 @@ def ReadPythonResult(cam_id, station, active_stations):
                 total_delay = sum(_get_delay_for_station(i) for i in (1, 2, 3, 4))
                 print(f"⏳ Waiting {total_delay} sec before sending final result")
                 if total_delay > 0:
-                    time.sleep(total_delay)
+                    wait_for(total_delay)
 
                 code = "$OK#" if result_ok else "$NOK#"
                 DB.update_defect_count("OK" if result_ok else "NOK")
@@ -962,7 +990,7 @@ def run_sequential_process(active_stations, sock):
             delay_time = _get_delay_for_station(int(station[-1]))
             print(f"⏳ Waiting {delay_time} sec before {station}")
             if delay_time > 0:
-                time.sleep(delay_time)
+                wait_for(delay_time)
 
 
             # Check previous station result
@@ -981,7 +1009,7 @@ def run_sequential_process(active_stations, sock):
                     print(
                         f"⏳ Waiting {delay_time} sec before skipping {station} due to earlier NOK"
                     )
-                    time.sleep(delay_time)
+                    wait_for(delay_time)
 
                 print(f"❌ Skipping {station} because previous stage was NOK")
                 station_result_queues[station].put(False)
@@ -999,7 +1027,7 @@ def run_sequential_process(active_stations, sock):
                         print(
                             f"⏳ Waiting {total_delay} sec before sending final NOK (due to earlier NOK)"
                         )
-                        time.sleep(total_delay)
+                        wait_for(total_delay)
 
                         ok = send_until_ack(
                             sock,

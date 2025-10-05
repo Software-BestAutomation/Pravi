@@ -448,7 +448,7 @@ def save_final_result_image(image, dim_data, flash_data, concentricity_data=None
         # 2) Additionally write a timestamped backup copy if a backup folder is provided
         if backup_output_folder:
             try:
-                backup_name = f"cam1_bmp_{timestamp}.bmp"
+                backup_name = f"cam1_bmp_{timestamp}.png"
                 backup_path = os.path.join(backup_output_folder, backup_name)
                 cv2.imwrite(backup_path, result_img)
                 print(f"Backup copy saved to: {backup_path}")
@@ -472,7 +472,7 @@ def save_final_result_image(image, dim_data, flash_data, concentricity_data=None
                 try:
                     os.makedirs(backup_output_folder, exist_ok=True)
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_name = f"cam1_bmp_{timestamp}.bmp"
+                    backup_name = f"cam1_bmp_{timestamp}.png"
                     backup_path = os.path.join(backup_output_folder, backup_name)
                     cv2.imwrite(backup_path, image)
                     print(f"Backup copy (exception path) saved to: {backup_path}")

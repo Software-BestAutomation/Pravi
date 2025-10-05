@@ -12,7 +12,7 @@ from datetime import datetime
 
 # ==== Load Test Image ====
 # image_path = r"D:\Pravi\burr_images\new_glass\station4\dataset\5_9_25\VCXG.2-32C\image0000504.bmp"
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam2.bmp"
+image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam2\2025-10-05\12\cam2_2025-10-05_12-02-16.png.bmp"
 frame = cv2.imread(image_path)
 
 # ==== Parameters ====
@@ -29,7 +29,7 @@ output_folder = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output"
 backup_output_folder = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output\cam2_output_backup"
 
 # New threshold parameters (software-controlled)
-min_thresh = "50"
+min_thresh = "35"
 max_thresh = "255"
 
 # ==== Call the main() Function ====

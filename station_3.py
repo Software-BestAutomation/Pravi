@@ -4,6 +4,7 @@
 # - Fix numpy array truth evaluation error by explicit checks on None and size.
 # - Add backup_output_folder param to save timestamped backup copies of cam3_bmp.
 # - Legacy cam3_bmp.bmp output path unchanged.
+# - NEW: Enforce processing-contour gating (area 400000-500000); pass masked_image to detection; fallback + backup if not found.
 
 import station_3_defect as dt
 import cv2
@@ -17,13 +18,13 @@ def _parse_num(val, typ):
 
 def _write_backup(image, filename, backup_output_folder):
     try:
-        if backup_output_folder:
+        if backup_output_folder and image is not None:
             os.makedirs(backup_output_folder, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_name = f"{os.path.splitext(filename)[0]}_{ts}.bmp"
             backup_path = os.path.join(backup_output_folder, backup_name)
-            cv2.imwrite(backup_path, image)
-            print(f"Backup copy saved to: {backup_path}")
+            ok = cv2.imwrite(backup_path, image)
+            print(f"Backup copy saved to: {backup_path} ({ok})")
     except Exception as e:
         print(f"Backup file error: {e}")
 
@@ -79,6 +80,27 @@ def main(part, subpart, frame,
         output_folder=output_folder
     )
 
+    # Enforce processing-contour gating (area 400000-500000)
+    if processed.get("processing_contour") is None:
+        print("r")
+        print("Result: NOK")
+        print("Error: processing_contour_not_found")
+        # Write fallback legacy + backup for traceability
+        try:
+            os.makedirs(output_folder, exist_ok=True)
+            fallback_path = os.path.join(output_folder, "cam3_bmp.bmp")
+            if frame is not None:
+                ok = cv2.imwrite(fallback_path, frame)
+                print(f"Fallback write (no processing contour) to {fallback_path}: {ok}")
+                if backup_output_folder:
+                    _write_backup(frame, "cam3_bmp.bmp", backup_output_folder)
+        except Exception as e:
+            print(f"Fallback error (no processing contour): {e}")
+        return {"resultType": "e", "error": "processing_contour_not_found"}
+
+    # Use masked image so detection runs strictly inside the processing contour
+    proc_frame = processed.get("masked_image", frame)
+
     if len(processed["sorted_contours"]) < 1:
         print("r")
         print("Result: NOK")
@@ -86,7 +108,7 @@ def main(part, subpart, frame,
         return {"resultType": "e", "error": "not_enough_contours"}
 
     det = dt.detect_burr_both(
-        frame, processed["sorted_contours"],
+        proc_frame, processed["sorted_contours"],
         id_offset, id_high, id_ba_min, id_ba_max,
         id_bp_min, id_bp_max,
         od_offset, od_high, od_ba_min, od_ba_max,
@@ -132,6 +154,158 @@ def main(part, subpart, frame,
         "od": {"status": det["od"]["burr_status"], "count": det["od"]["burr_count"], "time_ms": det["od"].get("time_ms", 0.0), "image_path": os.path.join(output_folder, "cam3_od.bmp")},
         "combined_image_both_crop_path": combined_both_crop_path,
     }
+
+
+
+
+
+
+
+
+
+
+
+# # code 2
+# # station_3.py - combine ID & OD
+# # Changes:
+# # - Fix numpy array truth evaluation error by explicit checks on None and size.
+# # - Add backup_output_folder param to save timestamped backup copies of cam3_bmp.
+# # - Legacy cam3_bmp.bmp output path unchanged.
+
+# import station_3_defect as dt
+# import cv2
+# import os
+# from datetime import datetime
+
+# def _parse_num(val, typ):
+#     if val == "NA" or val is None:
+#         return None
+#     return typ(val)
+
+# def _write_backup(image, filename, backup_output_folder):
+#     try:
+#         if backup_output_folder:
+#             os.makedirs(backup_output_folder, exist_ok=True)
+#             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+#             backup_name = f"{os.path.splitext(filename)[0]}_{ts}.bmp"
+#             backup_path = os.path.join(backup_output_folder, backup_name)
+#             cv2.imwrite(backup_path, image)
+#             print(f"Backup copy saved to: {backup_path}")
+#     except Exception as e:
+#         print(f"Backup file error: {e}")
+
+# def main(part, subpart, frame,
+#          ID2_OFFSET_ID, HIGHLIGHT_SIZE_ID,
+#          ID_BURR_MIN_AREA, ID_BURR_MAX_AREA,
+#          ID_BURR_MIN_PERIMETER, ID_BURR_MAX_PERIMETER,
+#          ID2_OFFSET_OD, HIGHLIGHT_SIZE_OD,
+#          OD_BURR_MIN_AREA, OD_BURR_MAX_AREA,
+#          OD_BURR_MIN_PERIMETER, OD_BURR_MAX_PERIMETER,
+#          min_id_area, max_id_area,
+#          min_od_area, max_od_area,
+#          min_circularity, max_circularity,
+#          min_aspect_ratio, max_aspect_ratio,
+#          output_folder,
+#          backup_output_folder=None):  # New backup path param
+
+#     try:
+#         id_offset = _parse_num(ID2_OFFSET_ID, int)
+#         id_high = _parse_num(HIGHLIGHT_SIZE_ID, int)
+#         id_ba_min = _parse_num(ID_BURR_MIN_AREA, int)
+#         id_ba_max = _parse_num(ID_BURR_MAX_AREA, int)
+#         id_bp_min = _parse_num(ID_BURR_MIN_PERIMETER, int)
+#         id_bp_max = _parse_num(ID_BURR_MAX_PERIMETER, int)
+
+#         od_offset = _parse_num(ID2_OFFSET_OD, int)
+#         od_high = _parse_num(HIGHLIGHT_SIZE_OD, int)
+#         od_ba_min = _parse_num(OD_BURR_MIN_AREA, int)
+#         od_ba_max = _parse_num(OD_BURR_MAX_AREA, int)
+#         od_bp_min = _parse_num(OD_BURR_MIN_PERIMETER, int)
+#         od_bp_max = _parse_num(OD_BURR_MAX_PERIMETER, int)
+
+#         min_id_area = int(min_id_area) if min_id_area is not None else None
+#         max_id_area = int(max_id_area) if max_id_area is not None else None
+#         min_od_area = int(min_od_area) if min_od_area is not None else None
+#         max_od_area = int(max_od_area) if max_od_area is not None else None
+#         min_circularity = float(min_circularity) if min_circularity is not None else None
+#         max_circularity = float(max_circularity) if max_circularity is not None else None
+#         min_aspect_ratio = float(min_aspect_ratio) if min_aspect_ratio is not None else None
+#         max_aspect_ratio = float(max_aspect_ratio) if max_aspect_ratio is not None else None
+#     except Exception:
+#         print("r")
+#         print("Result: NOK")
+#         print("Error: parameter_conversion")
+#         return {"resultType": "e", "error": "parameter_conversion"}
+
+#     processed = dt.preprocess_image(
+#         frame,
+#         min_id_area=min_id_area, max_id_area=max_id_area,
+#         min_od_area=min_od_area, max_od_area=max_od_area,
+#         min_circularity=min_circularity, max_circularity=max_circularity,
+#         min_aspect_ratio=min_aspect_ratio, max_aspect_ratio=max_aspect_ratio,
+#         output_folder=output_folder
+#     )
+
+#     if len(processed["sorted_contours"]) < 1:
+#         print("r")
+#         print("Result: NOK")
+#         print("Error: not_enough_contours")
+#         return {"resultType": "e", "error": "not_enough_contours"}
+
+#     det = dt.detect_burr_both(
+#         frame, processed["sorted_contours"],
+#         id_offset, id_high, id_ba_min, id_ba_max,
+#         id_bp_min, id_bp_max,
+#         od_offset, od_high, od_ba_min, od_ba_max,
+#         od_bp_min, od_bp_max,
+#         min_id_area=min_id_area, max_id_area=max_id_area,
+#         min_od_area=min_od_area, max_od_area=max_od_area,
+#         min_circularity=min_circularity, max_circularity=max_circularity,
+#         min_aspect_ratio=min_aspect_ratio, max_aspect_ratio=max_aspect_ratio,
+#         output_folder=output_folder,
+#         id_contour=processed.get("id_contour"),
+#         od_contour=processed.get("od_contour")
+#     )
+
+#     combined_both_crop_path = os.path.join(output_folder, "cam3_bmp.bmp")
+
+#     # Fix: explicit None and .size checks to avoid ValueError on numpy arrays
+#     if det.get("combined_output_image_both_crop") is not None and det["combined_output_image_both_crop"].size > 0:
+#         write_src = det["combined_output_image_both_crop"]
+#     elif det.get("combined_output_image") is not None and det["combined_output_image"].size > 0:
+#         write_src = det["combined_output_image"]
+#     else:
+#         write_src = processed["image"]
+
+#     write_ok = cv2.imwrite(combined_both_crop_path, write_src)
+#     if not write_ok:
+#         try:
+#             write_ok = cv2.imwrite(combined_both_crop_path, frame)
+#             print(f"Fallback write of original to {combined_both_crop_path}: {write_ok}")
+#         except Exception as e:
+#             print(f"Fallback write error to {combined_both_crop_path}: {e}")
+
+#     if backup_output_folder:
+#         _write_backup(write_src, "cam3_bmp.bmp", backup_output_folder)
+
+#     print("r")
+#     print(f"ID -> status: {det['id']['burr_status']}, count: {det['id']['burr_count']}, time_ms: {det['id'].get('time_ms', 0):.2f}, path: {os.path.join(output_folder, 'cam3_id.bmp')}")
+#     print(f"OD -> status: {det['od']['burr_status']}, count: {det['od']['burr_count']}, time_ms: {det['od'].get('time_ms', 0):.2f}, path: {os.path.join(output_folder, 'cam3_od.bmp')}")
+#     print(f"Combined (both crop, cam3_bmp): {combined_both_crop_path}")
+
+#     return {
+#         "resultType": "r", "part": part, "subpart": subpart,
+#         "id": {"status": det["id"]["burr_status"], "count": det["id"]["burr_count"], "time_ms": det["id"].get("time_ms", 0.0), "image_path": os.path.join(output_folder, "cam3_id.bmp")},
+#         "od": {"status": det["od"]["burr_status"], "count": det["od"]["burr_count"], "time_ms": det["od"].get("time_ms", 0.0), "image_path": os.path.join(output_folder, "cam3_od.bmp")},
+#         "combined_image_both_crop_path": combined_both_crop_path,
+#     }
+
+
+
+
+
+
+
 
 
 

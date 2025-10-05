@@ -473,16 +473,23 @@ cam_events = {
     "cam4": Event(),
 }
 
+from time import monotonic, sleep
+
 @app.route('/stream')
 def stream():
     def event_stream():
         while True:
+            sent = False
             for cam_id, event in cam_events.items():
                 if event.is_set():
                     yield f"data: {cam_id}\n\n"
                     print(f"📡 Sending '{cam_id}' event to frontend")
                     event.clear()
-            time.sleep(0.1)
+                    sent = True
+            if not sent:
+                deadline = monotonic() + 0.1
+                while monotonic() < deadline:
+                    sleep(0.01)
     return Response(event_stream(), mimetype='text/event-stream')
 
 @app.route('/trigger/<cam_id>', methods=['POST'])

@@ -22,7 +22,7 @@ def preprocess_image(frame, output_folder=None, min_thresh=50, max_thresh=255):
     print('Min Thr:', min_thr, 'max  thr:', max_thr)
     _, thresh_img = cv2.threshold(gray, min_thr, max_thr, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    rect_x1, rect_y1 = 500, 600
+    rect_x1, rect_y1 = 500, 700
     rect_x2, rect_y2 = 1600, 950
     filtered_contours = []
     for contour in contours:
@@ -208,7 +208,7 @@ def save_thickness_result_image(image, thickness_data, flash_data, output_folder
         if backup_output_folder:
             try:
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_name = f"cam2_bmp_{ts}.bmp"
+                backup_name = f"cam2_bmp_{ts}.png"
                 backup_path = os.path.join(backup_output_folder, backup_name)
                 cv2.imwrite(backup_path, result_img)
                 print(f"Backup copy saved to: {backup_path}")
@@ -227,7 +227,7 @@ def save_thickness_result_image(image, thickness_data, flash_data, output_folder
                 try:
                     os.makedirs(backup_output_folder, exist_ok=True)
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_name = f"cam2_bmp_{ts}.bmp"
+                    backup_name = f"cam2_bmp_{ts}.png"
                     backup_path = os.path.join(backup_output_folder, backup_name)
                     cv2.imwrite(backup_path, image)
                     print(f"Backup copy (exception path) saved to: {backup_path}")
