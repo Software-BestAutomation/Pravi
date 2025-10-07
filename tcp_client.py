@@ -4,7 +4,6 @@ import time
 import CameraConnection as cs
 import dbscript as DB
 import requests
-import queue
 import cv2
 import station1 as Station1_detection
 import station2 as Station2_detection
@@ -13,10 +12,8 @@ import station_4 as Station4_detection
 from event_bus import push_result
 
 import data as dt
-
 from queue import Queue
 
-import cv2
 import numpy as np
 import os
 from PIL import Image
@@ -26,29 +23,16 @@ image2 = None
 image3 = None
 image4 = None
 
-# Define station queues globally - FIXED: Create individual queues for each station
-St1 = Queue()
-St2 = Queue()
-St3 = Queue()
-St4 = Queue()
-
-# FIXED: Map stations to their result queues
-station_result_queues = {
-    "C1": St1,
-    "C2": St2,
-    "C3": St3,
-    "C4": St4,
-}
-
-CONTROLLER_IP = "192.168.0.104"  # 192.168.31.36        controller IP 192.168.0.104
+CONTROLLER_IP = "192.168.0.104"  # controller IP
 CONTROLLER_PORT = 8888
 timeout = 5
 
 # Global control flag
 keep_running = True
 
-global sock
-sock = None  # set when connected inside communicate_with_controller
+# set when connected inside communicate_with_controller
+sock = None
+
 OutputFolder1 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam1output"
 OutputFolder2 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam2output"
 OutputFolder3 = r"D:\\PIM_25-09-25\\Pravi_Flask\\static\\OutputImages\\cam3output"
@@ -59,8 +43,30 @@ BackUpOutputFolder2 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2outp
 BackUpOutputFolder3 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam3output\cam3_output_backup"
 BackUpOutputFolder4 = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam4output\cam4_output_backup"
 
+# --- Debounce for $C1# ---
+# We’ll ignore repeated C1 triggers that arrive within this time window.
+# Default: 0.20 s (200 ms). You can override via dt.python_parameters["S1"]["C1_DEBOUNCE_MS"] or ["C1_DEBOUNCE_SEC"].
+last_c1_ts = 0.0  # last time we actually accepted (processed) a C1
 
-# Add near other globals
+def _get_c1_debounce_sec() -> float:
+    s1 = dt.python_parameters.get("S1", {}) or {}
+    # allow ms or sec in your config
+    val_ms = s1.get("C1_DEBOUNCE_MS") or s1.get("C1_DEBOUNCEMS")
+    if val_ms is not None:
+        try:
+            return float(val_ms) / 1000.0
+        except Exception:
+            pass
+    val_sec = s1.get("C1_DEBOUNCE_SEC") or s1.get("C1_DEBOUNCE")
+    if val_sec is not None:
+        try:
+            return float(val_sec)
+        except Exception:
+            pass
+    return 0.20  # default 200 ms
+
+
+# Socket send/recv lock
 sock_lock = threading.Lock()
 
 def send_until_ack(sock, cmd: str, ack_token: str, *,
@@ -112,13 +118,13 @@ def send_until_ack(sock, cmd: str, ack_token: str, *,
             except Exception as e:
                 print(f"❌ send error for {cmd.strip()}: {e}")
 
-            # No ack this try: short delay before resending
+            # No ack this try: short delay before resending (retry back-off)
             time.sleep(resend_every)
 
     print(f"⚠️ send_until_ack aborted for {cmd.strip()} (stopped or timed out)")
     return False
 
-# add near globals
+# Stop coordination
 stop_event = threading.Event()
 
 def wait_until(deadline_monotonic: float):
@@ -129,7 +135,6 @@ def wait_until(deadline_monotonic: float):
             return
         # sleep in small slices so STOP can interrupt quickly
         time.sleep(min(remaining, 0.05))
-
 
 def _get_delay_for_station(n: int) -> float:
     smap = dt.python_parameters.get(f"S{n}", {}) or {}
@@ -142,8 +147,7 @@ def _get_delay_for_station(n: int) -> float:
         return float(raw)
     except Exception:
         return 0.0
-    
-    
+
 def _delays():
     # seconds as floats; S1 is usually 0 (first station)
     return (
@@ -152,7 +156,6 @@ def _delays():
         _get_delay_for_station(3),
         _get_delay_for_station(4),
     )
-
 
 def build_command_sequence(param_dict):
     # Normalize keys
@@ -169,7 +172,7 @@ def build_command_sequence(param_dict):
 
     # Define a fixed order for commands
     ordered_keys = [
-        # Enable flags (always included)
+        # Enable flags (always included; mapping may skip them if PLC doesn't expect)
         "S1:Camera1Enable",
         "S2:Camera2Enable",
         "S3:Camera3Enable",
@@ -260,7 +263,6 @@ def build_command_sequence(param_dict):
     print(f"✅ Command list built with {len(command_list)} commands")
     return command_list
 
-
 def communicate_with_controller(param_dict):
     global sock
     global keep_running
@@ -274,14 +276,6 @@ def communicate_with_controller(param_dict):
     }
     active_stations = [c for c in ["C1", "C2", "C3", "C4"] if enabled[c]]
     print(f"🔧 Active stations: {active_stations}")
-
-    # Clear per-station result queues
-    for q in station_result_queues.values():
-        while not q.empty():
-            try:
-                q.get_nowait()
-            except Exception:
-                break
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -342,23 +336,40 @@ def communicate_with_controller(param_dict):
 
                 # Controller -> UI triggers and commands
                 if "$C1#" in data:
-                    # ACK back to controller (your spec does NOT require "ACK of ACK")
+                    # Always ACK quickly so PLC/controller doesn't keep resending
                     try:
                         sock.sendall("$ACK_C1#\r\n".encode())
                     except Exception as e:
                         print(f"❌ Failed to send $ACK_C1#: {e}")
-                    print("✅ C1 received — starting processing")
 
-                    # Optional short pre-delay before starting your sequential process
+                    # ---- Debounce logic ----
+                    # If multiple $C1# arrive within a few milliseconds, accept only the first.
+                    # Anything inside the debounce window is ignored (but still ACKed above).
+                    now = time.monotonic()
+                    debounce = _get_c1_debounce_sec()
+
+                    # Read/update a global "last accepted" timestamp
+                    global last_c1_ts
+                    if (now - last_c1_ts) < debounce:
+                        print(f"🛑 Ignored duplicate C1 (only {now - last_c1_ts:.3f}s since last). Debounce={debounce:.3f}s")
+                        continue  # do NOT start a new part pipeline
+
+                    # This C1 is accepted; remember its time
+                    last_c1_ts = now
+
+                    print("✅ C1 accepted — starting per-part pipeline")
+
+                    # Optional small pre-delay if you want (kept from your code)
                     delay_time = 0.8
                     if delay_time > 0:
-                        print(f"⏳ Waiting {delay_time} sec before triggering sequential process...")
+                        print(f"⏳ Waiting {delay_time} sec before triggering per-part pipeline...")
                         wait_until(time.monotonic() + delay_time)
                         if not keep_running or stop_event.is_set():
                             continue
+
                     stop_event.clear()
                     threading.Thread(
-                        target=run_sequential_process,
+                        target=run_part_pipeline,
                         args=(active_stations, sock),
                         daemon=True
                     ).start()
@@ -387,12 +398,10 @@ def communicate_with_controller(param_dict):
                     continue
 
                 if "$STR#" in data:
-                    # Start coming from hardware; acknowledge and (optionally) trigger your flow
                     try:
                         sock.sendall("$ACK_STR#\r\n".encode())
                     except Exception as e:
                         print(f"❌ Failed to send $ACK_STR#: {e}")
-                    # If you want hardware STR to auto-start too, you could kick off here.
                     continue
 
                 if "$STP#" in data:
@@ -423,114 +432,124 @@ def communicate_with_controller(param_dict):
     except Exception as e:
         print(f"❌ Error in communicate_with_controller: {e}")
 
+def _send_raw_noack(s, msg: str):
+    """Send one line without waiting for ACK. Safe even if peer is slow."""
+    try:
+        if not msg.endswith("\r\n"):
+            msg = msg + "\r\n"
+        s.sendall(msg.encode())
+        print(f"📤 Sent (no-ACK): {msg.strip()}")
+    except Exception as e:
+        print(f"❌ send error (no-ACK) for {msg.strip()}: {e}")
+
+def _force_close_socket():
+    """Force-close the global socket safely."""
+    global sock
+    try:
+        with sock_lock:
+            if sock is not None:
+                try:
+                    # Try to shutdown nicely first
+                    sock.shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass  # ignore if already closed / not connected
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                sock = None
+                print("🔌 TCP socket forcibly closed.")
+    except Exception as e:
+        print(f"❌ Error while force-closing socket: {e}")
+
 
 def stop_process():
+    """
+    HARD STOP:
+    1) Flip local flags (STOP everything here).
+    2) Best-effort: send 2–3 STP quickly on the current socket (no ACK wait).
+    3) Regardless of ACK, FORCE-CLOSE the TCP connection.
+    4) Optional: try a new short-lived connection to send 1 more STP, then close.
+    """
     global sock, keep_running
     print("🛑 Stop requested")
 
-    # 1) Try to send STP on the existing session first
-    sent_any = False
-    try:
-        if sock is not None:
-            print("📨 Sending STP on existing session")
-            ok = send_until_ack(
-                sock, "$STP#", "$ACK_STP#",
-                timeout_per_try=timeout,
-                resend_every=0.2,
-                max_wait=5*timeout
-            )
-            print("✅ Received ACK_STP" if ok else "⚠️ No ACK_STP on existing session")
-            sent_any = True
-    except Exception as e:
-        print(f"❌ Error sending STP on existing session: {e}")
-
-    # 2) Optional fallback: new connection (only if needed by your PLC)
-    if not sent_any:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
-                s2.settimeout(timeout)
-                s2.connect((CONTROLLER_IP, CONTROLLER_PORT))
-                print("🛑 Connected (fallback) to send STP")
-                ok = send_until_ack(
-                    s2, "$STP#", "$ACK_STP#",
-                    timeout_per_try=timeout,
-                    resend_every=0.2,
-                    max_wait=5*timeout
-                )
-                print("✅ Received ACK_STP (fallback)" if ok else "⚠️ No ACK_STP (fallback)")
-        except Exception as e:
-            print(f"❌ Fallback STP failed: {e}")
-
-    # 3) Now stop local loops and disconnect cameras
+    # 1) Flip local flags first so all loops exit quickly
     stop_event.set()
     keep_running = False
-    cs.camera_disconnect()
+    cs.camera_disconnect()  # disconnect cameras immediately
 
+    # 2) Best-effort STP spam on existing socket (no ACK wait)
+    try:
+        with sock_lock:
+            if sock is not None:
+                for i in range(3):           # send 3 times fast
+                    _send_raw_noack(sock, "$STP#")
+                    time.sleep(0.15)        # small gap between sends (150 ms)
+    except Exception as e:
+        print(f"❌ Error while blasting STP on existing socket: {e}")
 
-def C_TriggeredProcess(cam_id, station, active_stations):
-    if cam_id == "cam1":
-        thread = threading.Thread(
-            target=Capture_Prosses_Triggerflask, args=("cam1", station, active_stations)
-        )
-        thread.start()
+    # 3) FORCE-CLOSE regardless of ACK
+    _force_close_socket()
 
-    elif cam_id == "cam2":
-        print("C_TriggeredProcess Started for cam2")
-        thread = threading.Thread(
-            target=Capture_Prosses_Triggerflask, args=("cam2", station, active_stations)
-        )
-        thread.start()
+    # 4) Optional: one last STP via a fresh, short-lived connection (best-effort)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+            s2.settimeout(1.0)
+            s2.connect((CONTROLLER_IP, CONTROLLER_PORT))
+            print("🛑 Fallback connect just to send final STP")
+            _send_raw_noack(s2, "$STP#")
+            time.sleep(0.1)
+            _send_raw_noack(s2, "$STP#")
+            # not waiting for ACK; socket auto-closes by context manager
+    except Exception as e:
+        print(f"⚠️ Fallback STP attempt failed (safe to ignore): {e}")
 
-    elif cam_id == "cam3":
-        thread = threading.Thread(
-            target=Capture_Prosses_Triggerflask, args=("cam3", station, active_stations)
-        )
-        thread.start()
+    print("✅ Stop sequence completed (socket closed regardless of ACK).")
 
-    elif cam_id == "cam4":
-        thread = threading.Thread(
-            target=Capture_Prosses_Triggerflask, args=("cam4", station, active_stations)
-        )
-        thread.start()
+def C_TriggeredProcess(cam_id, station, active_stations, ctx, result_queues):
+    # launch capture+process for this station in its own thread
+    t = threading.Thread(
+        target=Capture_Prosses_Triggerflask,
+        args=(cam_id, station, active_stations, ctx, result_queues),
+        daemon=True
+    )
+    t.start()
 
-
-def Capture_Prosses_Triggerflask(cam_id, station, active_stations):
+def Capture_Prosses_Triggerflask(cam_id, station, active_stations, ctx, result_queues):
     if cam_id == "cam1":
         dt.Frames["Cam1frame"] = cs.capture_image_1()
         ReadPythonResult(
-            cam_id="cam1", station=station, active_stations=active_stations
+            cam_id="cam1", station=station, active_stations=active_stations,
+            ctx=ctx, result_queues=result_queues
         )
         trigger_flask_camera(cam_id)
 
-    if cam_id == "cam2":
-        print("Capture_Prosses_Triggerflask Started for cam2")
+    elif cam_id == "cam2":
         dt.Frames["Cam2frame"] = cs.capture_image_2()
         ReadPythonResult(
-            cam_id="cam2", station=station, active_stations=active_stations
+            cam_id="cam2", station=station, active_stations=active_stations,
+            ctx=ctx, result_queues=result_queues
         )
         trigger_flask_camera(cam_id)
 
-    if cam_id == "cam3":
+    elif cam_id == "cam3":
         dt.Frames["Cam3frame"] = cs.capture_image_3()
         ReadPythonResult(
-            cam_id="cam3", station=station, active_stations=active_stations
+            cam_id="cam3", station=station, active_stations=active_stations,
+            ctx=ctx, result_queues=result_queues
         )
         trigger_flask_camera(cam_id)
 
-    if cam_id == "cam4":
+    elif cam_id == "cam4":
         dt.Frames["Cam4frame"] = cs.capture_image_4()
         ReadPythonResult(
-            cam_id="cam4", station=station, active_stations=active_stations
+            cam_id="cam4", station=station, active_stations=active_stations,
+            ctx=ctx, result_queues=result_queues
         )
         trigger_flask_camera(cam_id)
 
-
-# Globals for per-part DB state (reset at start of each new part)
-current_part_inserted = False
-inserted_s_no = None
-
-
-def ReadPythonResult(cam_id, station, active_stations):
+def ReadPythonResult(cam_id, station, active_stations, ctx, result_queues):
     part_name = "PISTON"
     subpart_name = ""
     part_id = "P1S1"
@@ -538,14 +557,12 @@ def ReadPythonResult(cam_id, station, active_stations):
     supplier_name = "S1"
     invoice_no = "I1"
 
-    global current_part_inserted, inserted_s_no
-
     cam_num = int(cam_id[-1])
 
     # 1️⃣ If camera is disabled, skip it and pass an OK token
     if not getattr(cs, f"isConnectedCamera{cam_num}")():
         print(f"{cam_id.upper()} is disabled. Passing OK to next stage.")
-        station_result_queues[station].put(True)
+        result_queues[station].put(True)
         return
 
     # Initialize result variables
@@ -558,7 +575,7 @@ def ReadPythonResult(cam_id, station, active_stations):
         params = dt.python_parameters["S1"]
         print(params)
 
-        # Now call the function with unpacked values
+        # Unpack from Station1
         (
             resultType,
             result,
@@ -611,15 +628,9 @@ def ReadPythonResult(cam_id, station, active_stations):
             f"output_folder={OutputFolder1}"
         )
 
-        result_ok = result == "OK"
-
-        if result == "OK":
-            flash_id = "OK"
-            flash_od = "OK"
-
-        else:
-            flash_id = "NOK"
-            flash_od = "NOK"
+        result_ok = (result == "OK")
+        flash_id = "OK" if result_ok else "NOK"
+        flash_od = "OK" if result_ok else "NOK"
 
         payload = {
             "result": "OK" if result_ok else "NOK",
@@ -633,8 +644,8 @@ def ReadPythonResult(cam_id, station, active_stations):
         }
         push_result(cam_id, payload)
 
-        if not current_part_inserted:
-            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+        if not ctx.get("current_part_inserted", False):
+            ctx["inserted_s_no"] = DB.insert_workpartdetail_1st_Station(
                 date_time,
                 part_name,
                 subpart_name,
@@ -659,10 +670,10 @@ def ReadPythonResult(cam_id, station, active_stations):
                 supplier_name,
                 invoice_no,
             )
-            current_part_inserted = True
+            ctx["current_part_inserted"] = True
 
     elif cam_id == "cam2":
-        ( 
+        (
             resultType,
             result,            # "OK" / "NOK"
             error,             # general error string (if any)
@@ -678,11 +689,10 @@ def ReadPythonResult(cam_id, station, active_stations):
             thick_max=dt.python_parameters["S2"]["THICKNESSMAX"],
             pixel_to_micron=dt.python_parameters["S2"]["PIXELTOMICRON"],
             output_folder=OutputFolder2,
-            min_thresh = dt.python_parameters["S2"]["MINTHRESH"],
-            max_thresh = dt.python_parameters["S2"]["MAXTHRESH"],
+            min_thresh=dt.python_parameters["S2"]["MINTHRESH"],
+            max_thresh=dt.python_parameters["S2"]["MAXTHRESH"],
             backup_output_folder=BackUpOutputFolder2
         )
-        
 
         print(
             f"Station 2 ResultType: {resultType}, Result: {result}, "
@@ -692,31 +702,24 @@ def ReadPythonResult(cam_id, station, active_stations):
         result_ok = (result == "OK")
         thickness_status = "OK" if result_ok else "NOK"
 
-        # ---- SSE payload: status in defects, numeric value in dimensions ----
         payload = {
             "result": "OK" if result_ok else "NOK",
-            "defects": {
-                "vertical_flash": thickness_status
-            },
-            "dimensions": {
-                "thickness": thickness
-            },
+            "defects": {"vertical_flash": thickness_status},
+            "dimensions": {"thickness": thickness},
         }
         print("Sending payload:", payload)
         push_result(cam_id, payload)
 
-        # ---- DB insert/update ----
-        if not current_part_inserted:
-            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+        if not ctx.get("current_part_inserted", False):
+            ctx["inserted_s_no"] = DB.insert_workpartdetail_1st_Station(
                 date_time,
                 part_name,
                 subpart_name,
                 part_id,
                 station,
-                # S1 (not run here) -> "NA"
-                "NA", "NA", "NA", "NA",
-                "NA", "NA", "NA",
-                # S2 (correct mapping)
+                # S1 placeholders
+                "NA", "NA", "NA", "NA", "NA", "NA", "NA",
+                # S2
                 outputPath,          # Thickness_Cam_Image
                 thickness_status,    # Thickness_Result (OK/NOK)
                 thickness_error,     # Thickness_Cam_Error_Description
@@ -727,14 +730,15 @@ def ReadPythonResult(cam_id, station, active_stations):
                 supplier_name,
                 invoice_no,
             )
-            current_part_inserted = True
+            ctx["current_part_inserted"] = True
         else:
             DB.update_workpartdetail_2nd_Station(
-                inserted_s_no,       # S_No to update
-                station,             # Current_Station
-                thickness_status,    # Thickness_Result (OK/NOK)
-                thickness_error,     # Thickness_Cam_Error_Description
+                ctx["inserted_s_no"],
+                station,
+                thickness_status,
+                thickness_error,
             )
+
     elif cam_id == "cam3":
         res = Station3_detection.main(
             part=dt.StaticData["PartName"],
@@ -768,70 +772,64 @@ def ReadPythonResult(cam_id, station, active_stations):
             max_aspect_ratio=dt.python_parameters["S3"]["max_aspect_ratio3"],
 
             output_folder=OutputFolder3,
-            backup_output_folder = BackUpOutputFolder3
+            backup_output_folder=BackUpOutputFolder3
         )
 
-        # res is a dict per your new station3.py
-        # Example keys: res["id"]["status"], res["id"]["count"], res["od"]["status"], res["od"]["count"], ...
         id_status = (res.get("id") or {}).get("status", "NOK")
         od_status = (res.get("od") or {}).get("status", "NOK")
         id_count = (res.get("id") or {}).get("count", 0)
         od_count = (res.get("od") or {}).get("count", 0)
 
-        # Decide overall station result: OK only if both ID & OD are OK
         result_ok = (id_status == "OK" and od_status == "OK")
-        top_burr_status = "OK" if result_ok else "NOK"   # keep your existing front-end contract
+        top_burr_status = "OK" if result_ok else "NOK"
 
         payload = {
             "result": "OK" if result_ok else "NOK",
-            "defects": {
-                "top_burr": top_burr_status
-            },
+            "defects": {"top_burr": top_burr_status},
             "dimensions": {
-                # if you want to expose counts/timings to UI, put them here (optional):
                 "id_burr_count": id_count,
                 "od_burr_count": od_count
             }
         }
         push_result(cam_id, payload)
 
-        if not current_part_inserted:
-            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+        if not ctx.get("current_part_inserted", False):
+            ctx["inserted_s_no"] = DB.insert_workpartdetail_1st_Station(
                 date_time, part_name, subpart_name, part_id, station,
                 # S1 placeholders
                 "NA", "NA", "NA", "NA", "NA", "NA", "NA",
-                # S2 placeholders (already handled earlier if cam2 ran first)
+                # S2 placeholders
                 "NA", "NA", "NA",
-                # S3 placeholders or summaries — adjust once you wire columns
+                # S3 placeholders (adjust to your schema once finalized)
                 "NA", "NA", "NA",
                 # S4 placeholders
                 "NA", "NA", "NA",
                 supplier_name, invoice_no
             )
-            current_part_inserted = True
+            ctx["current_part_inserted"] = True
         else:
-            # Your DB.update_workpartdetail_3rd_Station is a stub; call once you define columns
             DB.update_workpartdetail_3rd_Station(
                 "OK" if result_ok else "NOK",
                 None,                # Error (if you decide to surface one)
                 top_burr_status,     # Burr status summary
                 id_count + od_count  # Total burr count (example)
             )
+
     elif cam_id == "cam4":
         res = Station4_detection.main(
             part=dt.StaticData["PartName"],
             subpart=dt.StaticData["SubPartName"],
             frame=dt.Frames["Cam4frame"],
 
-            # ---- ID (inner) params (your S4 table names) ----
-            ID2_OFFSET_ID=dt.python_parameters["S4"]["ID4_OFFSET"],          # note: using ID4_OFFSET for ID side
+            # ---- ID (inner) params ----
+            ID2_OFFSET_ID=dt.python_parameters["S4"]["ID4_OFFSET"],
             HIGHLIGHT_SIZE_ID=dt.python_parameters["S4"]["HIGHLIGHT_SIZE"],
             ID_BURR_MIN_AREA=dt.python_parameters["S4"]["id_BURR_MIN_AREA"],
             ID_BURR_MAX_AREA=dt.python_parameters["S4"]["id_BURR_MAX_AREA"],
             ID_BURR_MIN_PERIMETER=dt.python_parameters["S4"]["id_BURR_MIN_PERIMETER"],
             ID_BURR_MAX_PERIMETER=dt.python_parameters["S4"]["id_BURR_MAX_PERIMETER"],
 
-            # ---- OD (outer) params (OD-suffixed names you already store) ----
+            # ---- OD (outer) params ----
             ID2_OFFSET_OD=dt.python_parameters["S4"]["ID2_OFFSET_OD4"],
             HIGHLIGHT_SIZE_OD=dt.python_parameters["S4"]["HIGHLIGHT_SIZE_OD4"],
             OD_BURR_MIN_AREA=dt.python_parameters["S4"]["OD_BURR_MIN_AREA4"],
@@ -850,10 +848,9 @@ def ReadPythonResult(cam_id, station, active_stations):
             max_aspect_ratio=dt.python_parameters["S4"]["max_aspect_ratio4"],
 
             output_folder=OutputFolder4,
-            backup_output_folder = BackUpOutputFolder4
+            backup_output_folder=BackUpOutputFolder4
         )
 
-        # Expect the same dict shape as station3.py
         id_status = (res.get("id") or {}).get("status", "NOK")
         od_status = (res.get("od") or {}).get("status", "NOK")
         id_count  = (res.get("id") or {}).get("count", 0)
@@ -872,8 +869,8 @@ def ReadPythonResult(cam_id, station, active_stations):
         }
         push_result(cam_id, payload)
 
-        if not current_part_inserted:
-            inserted_s_no = DB.insert_workpartdetail_1st_Station(
+        if not ctx.get("current_part_inserted", False):
+            ctx["inserted_s_no"] = DB.insert_workpartdetail_1st_Station(
                 date_time, part_name, subpart_name, part_id, station,
                 # S1
                 "NA","NA","NA","NA","NA","NA","NA",
@@ -885,7 +882,7 @@ def ReadPythonResult(cam_id, station, active_stations):
                 "NA","NA","NA",
                 supplier_name, invoice_no
             )
-            current_part_inserted = True
+            ctx["current_part_inserted"] = True
         else:
             DB.update_workpartdetail_4th_Station(
                 "OK" if result_ok else "NOK",
@@ -912,13 +909,12 @@ def ReadPythonResult(cam_id, station, active_stations):
                     print(f"Sent: {code} (ACK received)")
                 else:
                     print(f"⚠️ Sent: {code} (no ACK)")
-
             except Exception as e:
                 print(f"❌ Error sending final result: {e}")
-    # 3️⃣ FIXED: Put result in current station's queue
-    station_result_queues[station].put(result_ok)
-    print(f"📝 Station {station} result: {result_ok}")
 
+    # 3️⃣ Put result in THIS part's queue for THIS station
+    result_queues[station].put(result_ok)
+    print(f"📝 Station {station} result: {result_ok}")
 
 def trigger_flask_camera(cam_id):
     try:
@@ -927,7 +923,6 @@ def trigger_flask_camera(cam_id):
         print("Flask Response:", response.status_code)
     except Exception as e:
         print("Error triggering Flask:", e)
-
 
 def ConnectCam(param_dict):
     # Normalize keys
@@ -949,108 +944,95 @@ def ConnectCam(param_dict):
     if camera_enabled["cam4"]:
         cs.camera_connect4()
 
-
-def safe_get(obj, key, default=0):
-    try:
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-    except Exception:
-        pass
-    return default
-
-
-def run_sequential_process(active_stations, sock):
+def run_part_pipeline(active_stations, sock):
     """
-    Runs C1–C4 sequentially on an absolute schedule:
-      - Anchor at t0 (when this function starts after the C1 trigger)
-      - For C2..C4, start at cumulative absolute offsets:
-            C1: 0
-            C2: d2
-            C3: d2 + d3
-            C4: d2 + d3 + d4
-      where dN = _get_delay_for_station(N)
-    This avoids double-waiting and keeps timing precise.
+    Run the pipeline for ONE part.
+
+    IMPORTANT: S1 is the delay from SENSOR to CAMERA-1 capture time.
+               So C1 should NOT start at 0.0 — it should start at +S1.
+               After that, C2, C3, C4 start at cumulative times:
+               C2: +S1+S2, C3: +S1+S2+S3, C4: +S1+S2+S3+S4.
     """
 
-    # Debug: raw + computed delays
-    print("DEBUG raw delay keys:",
-          "S1", dt.python_parameters.get("S1", {}).get("CAM1DELAY") or dt.python_parameters.get("S1", {}).get("Delay_Cam1"),
-          "S2", dt.python_parameters.get("S2", {}).get("CAM2DELAY") or dt.python_parameters.get("S2", {}).get("Delay_Cam2"),
-          "S3", dt.python_parameters.get("S3", {}).get("CAM3DELAY") or dt.python_parameters.get("S3", {}).get("Delay_Cam3"),
-          "S4", dt.python_parameters.get("S4", {}).get("CAM4DELAY") or dt.python_parameters.get("S4", {}).get("Delay_Cam4"))
-    print("DEBUG computed delays:",
-          "S1", _get_delay_for_station(1),
-          "S2", _get_delay_for_station(2),
-          "S3", _get_delay_for_station(3),
-          "S4", _get_delay_for_station(4))
+    # Per-part context (DB info, etc.)
+    ctx = {"current_part_inserted": False, "inserted_s_no": None}
 
-    # Build absolute schedule (offsets from t0)
-    # Semantics kept from your previous code: you did NOT wait before C1, only before C2..C4.
-    d2 = _get_delay_for_station(2)
-    d3 = _get_delay_for_station(3)
-    d4 = _get_delay_for_station(4)
+    # One result queue (OK/NOK) per active station — isolated to THIS part/thread
+    from queue import Queue
+    result_queues = {st: Queue() for st in active_stations}
 
-    # Build absolute schedule from active_stations only
+    # ---- Build absolute OFFSETS in seconds from t0 ----
+    # We now include S1 for C1 so that camera-1 fires AFTER the part reaches the FOV.
     absolute_offsets = {}
-    acc = 0.0
-    for idx, st in enumerate(active_stations):
-        if st == "C1":
-            absolute_offsets[st] = 0.0
-        else:
-            acc += _get_delay_for_station(int(st[-1]))
-            absolute_offsets[st] = acc
+    acc = 0.0  # running sum of delays S1..S4
 
-    # Anchor time: right when we start the sequence
+    for st in active_stations:
+        # station name is like "C1","C2","C3","C4" → take the last char → 1..4
+        n = int(st[-1])
+
+        # Add THIS station's inter-stage delay (S1 for C1, S2 for C2, ...)
+        # S1 specifically means "sensor to CAM1 shutter" (your new requirement).
+        acc += _get_delay_for_station(n)
+
+        # The absolute start time for this station is the total we've accumulated so far.
+        absolute_offsets[st] = acc
+
+    # Mark the start using a stable (monotonic) clock
     t0 = time.monotonic()
 
+    # ---- Run stations in order ----
     for i, station in enumerate(active_stations):
+        # Stop quickly if a global stop is requested
         if not keep_running:
-            print("⛔️ Aborted: keep_running is False")
+            print("⛔️ Stopped by keep_running=False")
             return
 
-        cam_id = f"cam{station[-1]}"
+        cam_id = f"cam{station[-1]}"  # "C3" → "cam3"
 
-        # Skip disabled cameras (pass OK token forward so the chain can progress)
+        # If camera is disabled/not connected, skip but pass OK so line keeps moving
         if not getattr(cs, f"isConnectedCamera{station[-1]}")():
-            print(f"⚠️ {cam_id.upper()} is disabled. Passing OK to next stage.")
-            station_result_queues[station].put(True)
+            print(f"⚠️ {cam_id.upper()} disabled. Skipping and marking OK.")
+            result_queues[station].put(True)
             continue
 
-        # Wait until the absolute time for this station (from t0)
-        offset = absolute_offsets.get(station, 0.0)
+        # Wait until the absolute time for THIS station.
+        # Example: C1 waits S1; C2 waits S1+S2; etc.
+        offset = absolute_offsets[station]
         print(f"⏳ {station}: waiting until +{offset:.3f}s from start")
         wait_until(t0 + offset)
+
+        # If a stop arrived during the wait, bail out
         if not keep_running or stop_event.is_set():
-            print("⛔️ Aborted during wait")
+            print("⛔️ Stopped during wait")
             return
 
-        # For stations after the first, check previous station's result
+        # From C2 onward, only run if previous station was OK
         if i > 0:
             prev_station = active_stations[i - 1]
             try:
-                # small, tight timeout to keep the schedule crisp
-                ok_prev = station_result_queues[prev_station].get(timeout=0.1)
-                print(f"📝 Got result from {prev_station}: {ok_prev}")
+                ok_prev = result_queues[prev_station].get(timeout=0.1)  # quick check
+                print(f"📝 {prev_station} → {station}: prev OK? {ok_prev}")
             except Exception as e:
-                print(f"❌ No timely token from {prev_station} (treat as NOK): {e}")
+                print(f"❌ No result from {prev_station} (treat NOK): {e}")
                 ok_prev = False
 
             if not ok_prev:
-                print(f"❌ Skipping {station} because previous stage {prev_station} was NOK")
-                station_result_queues[station].put(False)
+                # Mark this station NOK and, if last, notify controller now
+                print(f"❌ Skipping {station} because {prev_station} was NOK")
+                result_queues[station].put(False)
 
-                # If this is the last active station, notify controller NOW (no extra delays)
                 if station == active_stations[-1]:
                     try:
                         ok = send_until_ack(
                             sock, "$NOK#", "$ACK_NOK#",
-                            timeout_per_try=timeout, resend_every=0.2, max_wait=5*timeout
+                            timeout_per_try=timeout, resend_every=0.2, max_wait=5 * timeout
                         )
-                        print("Sent: $NOK# (due to earlier NOK)" + (" [ACK]" if ok else " [no ACK]"))
+                        print("Sent $NOK# due to earlier NOK" + (" [ACK]" if ok else " [no ACK]"))
                     except Exception as ex:
                         print(f"❌ Error sending NOK: {ex}")
                 continue
 
-        # Kick off this station’s capture/processing
-        C_TriggeredProcess(cam_id, station, active_stations)
-        print(f"✅ {station} processing started.")
+        # Start capture/processing for this station.
+        # This function should push True/False into result_queues[station] when done.
+        C_TriggeredProcess(cam_id, station, active_stations, ctx, result_queues)
+        print(f"✅ {station} started.")
