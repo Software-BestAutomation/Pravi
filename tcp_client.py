@@ -23,7 +23,7 @@ image2 = None
 image3 = None
 image4 = None
 
-CONTROLLER_IP = "192.168.0.104"  # controller IP
+CONTROLLER_IP = "10.226.234.133"   #"192.168.0.100"  # controller IP
 CONTROLLER_PORT = 8888
 timeout = 5
 
@@ -360,12 +360,12 @@ def communicate_with_controller(param_dict):
                     print("✅ C1 accepted — starting per-part pipeline")
 
                     # Optional small pre-delay if you want (kept from your code)
-                    delay_time = 0.8
-                    if delay_time > 0:
-                        print(f"⏳ Waiting {delay_time} sec before triggering per-part pipeline...")
-                        wait_until(time.monotonic() + delay_time)
-                        if not keep_running or stop_event.is_set():
-                            continue
+                    # delay_time = 0.8
+                    # if delay_time > 0:
+                    #     print(f"⏳ Waiting {delay_time} sec before triggering per-part pipeline...")
+                    #     wait_until(time.monotonic() + delay_time)
+                    #     if not keep_running or stop_event.is_set():
+                    #         continue
 
                     stop_event.clear()
                     threading.Thread(
@@ -547,7 +547,7 @@ def Capture_Prosses_Triggerflask(cam_id, station, active_stations, ctx, result_q
             cam_id="cam4", station=station, active_stations=active_stations,
             ctx=ctx, result_queues=result_queues
         )
-        trigger_flask_camera(cam_id)
+        # trigger_flask_camera(cam_id)
 
 def ReadPythonResult(cam_id, station, active_stations, ctx, result_queues):
     part_name = "PISTON"
@@ -890,6 +890,8 @@ def ReadPythonResult(cam_id, station, active_stations, ctx, result_queues):
                 bottom_burr,        # Burr status summary
                 id_count + od_count # Example count aggregation
             )
+        # ✅ Show image in UI immediately (DO NOT wait for PLC ACK)
+        trigger_flask_camera("cam4")
 
         # Final OK/NOK only if C4 is the last active station
         if station == active_stations[-1]:
@@ -901,9 +903,12 @@ def ReadPythonResult(cam_id, station, active_stations, ctx, result_queues):
                     sock,
                     code,
                     ack_token,
-                    timeout_per_try=timeout,
-                    resend_every=0.2,
-                    max_wait=5*timeout
+                    # timeout_per_try=timeout,
+                    # resend_every=0.2,
+                    # max_wait=5*timeout
+                    timeout_per_try=1.0,
+                    resend_every=0.1,
+                    max_wait=10.0
                 )
                 if ok:
                     print(f"Sent: {code} (ACK received)")

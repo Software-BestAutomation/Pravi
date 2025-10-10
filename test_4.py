@@ -12,18 +12,38 @@ import os
 from datetime import datetime
 
 # Load test image
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam4\2025-10-04\17\cam4_2025-10-04_17-07-31.png.bmp"
+image_path = r"D:\Pravi\testing\dataset\8_10_25\VCXG.2-32C\image0000332.bmp"
 frame = cv2.imread(image_path)
 
 # ==== Configurable Parameters ====
 part = "SUPPORT PISTON"
 subpart = "28.10.019"
 
-# ID/OD Contour Area Parameters
-min_id_area = "10000"
-max_id_area = "22200"
-min_od_area = "95000"
-max_od_area = "150000"
+
+# ## for smallest
+# min_id_area = "2000"
+# max_id_area = "10000"
+# min_od_area = "20000"
+# max_od_area = "40000"
+
+#  for 3 big 
+
+
+min_id_area = "2000"
+max_id_area = "30000"
+min_od_area = "40000"   #25000
+max_od_area = "160000"  #45000
+
+
+
+
+
+
+# # ID/OD Contour Area Parameters
+# min_id_area = "10000"
+# max_id_area = "22200"
+# min_od_area = "95000"
+# max_od_area = "150000"
 
 # Shape filters ("NA" to disable)
 min_circularity = "0.15"
@@ -33,7 +53,7 @@ max_aspect_ratio = "1.10"
 
 # Burr Detection Parameters (ID)
 ID2_OFFSET_ID = "20"
-HIGHLIGHT_SIZE_ID = "20"
+HIGHLIGHT_SIZE_ID = "50"
 ID_BURR_MIN_AREA = "60"
 ID_BURR_MAX_AREA = "400"
 ID_BURR_MIN_PERIMETER = "30"
@@ -41,8 +61,8 @@ ID_BURR_MAX_PERIMETER = "300"
 
 # Burr Detection Parameters (OD)
 ID2_OFFSET_OD = "20"
-HIGHLIGHT_SIZE_OD = "20"
-OD_BURR_MIN_AREA = "60"
+HIGHLIGHT_SIZE_OD = "50"
+OD_BURR_MIN_AREA = "80"
 OD_BURR_MAX_AREA = "400"
 OD_BURR_MIN_PERIMETER = "30"
 OD_BURR_MAX_PERIMETER = "300"

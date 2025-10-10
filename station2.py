@@ -88,7 +88,7 @@ def main(part, subpart, frame, thick_min, thick_max, pixel_to_micron, output_fol
         try:
             if min_thresh in (None, "NA", ""):
                 print('Min thresh none passing it as 100')
-                min_thr = 100
+                min_thr = 0
             else:
                 min_thr = int(float(min_thresh))
                 print('min  thresh taken from else:', min_thr)
@@ -100,7 +100,7 @@ def main(part, subpart, frame, thick_min, thick_max, pixel_to_micron, output_fol
                 max_thr = int(float(max_thresh))
             max_thr = max(0, min(255, max_thr))
         except Exception:
-            min_thr = 100
+            min_thr = 0
             max_thr = 255
 
         result = {

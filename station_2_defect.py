@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 import imutils
 
-def preprocess_image(frame, output_folder=None, min_thresh=50, max_thresh=255):
+def preprocess_image(frame, output_folder=None, min_thresh=0, max_thresh=255):
     if output_folder:
         os.makedirs(output_folder, exist_ok=True)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -22,8 +22,8 @@ def preprocess_image(frame, output_folder=None, min_thresh=50, max_thresh=255):
     print('Min Thr:', min_thr, 'max  thr:', max_thr)
     _, thresh_img = cv2.threshold(gray, min_thr, max_thr, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    rect_x1, rect_y1 = 500, 700
-    rect_x2, rect_y2 = 1600, 950
+    rect_x1, rect_y1 = 400, 840
+    rect_x2, rect_y2 = 1750, 1050
     filtered_contours = []
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)

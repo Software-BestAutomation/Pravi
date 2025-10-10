@@ -12,24 +12,28 @@ from datetime import datetime
 
 # ==== Load Test Image ====
 # image_path = r"D:\Pravi\burr_images\new_glass\station4\dataset\5_9_25\VCXG.2-32C\image0000504.bmp"
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam2\2025-10-05\12\cam2_2025-10-05_12-02-16.png.bmp"
-frame = cv2.imread(image_path)
+# image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam2\2025-10-05\12\cam2_2025-10-05_12-02-16.png.bmp"
+
+# image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam2\2025-10-07\15\VCXG.2-32C\image0000587.bmp"
+
+mage_path = r"D:\Pravi\testing\dataset\8_10_25\VCXG.2-32C\image0000592.bmp"
+frame = cv2.imread(mage_path)
 
 # ==== Parameters ====
 part = "SUPPORT PISTON"
-subpart = "28.10.019"
-thick_min = "0.01"
-thick_max = "5.70"
+subpart = "22.10.013"
+thick_min = "1"
+thick_max = "3"
 pixel_to_micron = "44"
 
 # Primary output folder (legacy location for cam2_bmp.bmp)
 output_folder = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output"
 
-# New: configurable backup folder for timestamped copies
+# New: configu01rable backup folder for timestamped copies
 backup_output_folder = r"D:\PIM_25-09-25\Pravi_Flask\static\OutputImages\cam2output\cam2_output_backup"
 
 # New threshold parameters (software-controlled)
-min_thresh = "35"
+min_thresh = "40"
 max_thresh = "255"
 
 # ==== Call the main() Function ====

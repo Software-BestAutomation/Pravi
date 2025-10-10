@@ -47,7 +47,8 @@
 # python contour_area.py --image "D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\cam3.bmp"
 # python contour_area.py --image "D:\Pravi\burr_images\new_glass\station3\dataset\9_oct_25\VCXG.2-32C\image0000389.bmp"
 # python contour_area.py --image "D:/Pravi/burr_images/new_glass/station3/dataset/9_oct_25/VCXG.2-32C/image0000384.bmp"
-
+# python contour_area.py --image "D:/Pravi/burr_images/new_glass/station4/dataset/10_oct_25/image0000328.bmp"
+# python contour_area.py --image "D:/Pravi/burr_images/new_glass/station4/dataset/10_oct_25/image0000338.bmp"
 import cv2
 import numpy as np
 import sys
@@ -77,8 +78,8 @@ def draw_contours(img):
     # cv2.drawContours(contour_img, [sorted_contours[1]], -1, (0, 255, 0), 2)  # /yellow
     # cv2.drawContours(contour_img, [sorted_contours[2]], -1, (0, 0, 255), 2)  # yellow
     cv2.drawContours(contour_img, [sorted_contours[3]], -1, (255, 0, 0), 2)  # sky blu/e
-    cv2.drawContours(contour_img, [sorted_contours[4]], -1, (0, 255, 0), 2)  # yellow
-    # cv2.drawContours(contour_img, [sorted_contours[5]], -1, (0, 0, 255), 2)  # yello/w
+    # cv2.drawContours(contour_img, [sorted_contours[4]], -1, (0, 255, 0), 2)  # yellow
+    cv2.drawContours(contour_img, [sorted_contours[5]], -1, (0, 0, 255), 2)  # yello/w
     # cv2.drawContours(contour_img, [sorted_contours[6]], -1, (255, 0, 0), 2)  # sky blue
     # cv2.drawContours(contour_img, [sorted_contours[7]], -1, (0, 255, 0), 2)  # yellow
     # cv2.drawContours(contour_img, [sorted_contours[8]], -1, (0, 0, 255), 2)  # yellow

@@ -10,25 +10,44 @@ import cv2
 import os
 from datetime import datetime
 
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam3\2025-10-04\17\cam3_2025-10-04_17-03-40.png.bmp"
+image_path = r"D:\Pravi\testing\dataset\8_10_25\VCXG.2-32C\image0000383.bmp"
 frame = cv2.imread(image_path)
 print(f"DEBUG: Loaded image from: {image_path}")
 
 part = "SUPPORT PISTON"
-subpart = "28.10.019"
+subpart = "22.10.013"
 
-min_id_area = "13000"
-max_id_area = "23000"
-min_od_area = "85000"
-max_od_area = "160000"
 
-min_circularity = "0.50"
+## for smallest
+
+# min_id_area = "2000"
+# max_id_area = "10000"
+# min_od_area = "20000"   #25000
+# max_od_area = "50000"  #45000
+
+#  for 3 big 
+
+
+min_id_area = "2000"
+max_id_area = "30000"
+min_od_area = "40000"   #25000
+max_od_area = "160000"  #45000
+
+
+
+##28.10.019
+# min_id_area = "13000"
+# max_id_area = "23000"
+# min_od_area = "85000"
+# max_od_area = "160000"
+
+min_circularity = "0.10"
 max_circularity = "1.15"
-min_aspect_ratio = "0.30"
+min_aspect_ratio = "0.10"
 max_aspect_ratio = "1.10"
 
 ID2_OFFSET_ID = "10"
-HIGHLIGHT_SIZE_ID = "40"
+HIGHLIGHT_SIZE_ID = "50"
 ID_BURR_MIN_AREA = "60"
 ID_BURR_MAX_AREA = "400"
 ID_BURR_MIN_PERIMETER = "30"

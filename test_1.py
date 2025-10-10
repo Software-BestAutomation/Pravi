@@ -24,7 +24,8 @@ from datetime import datetime
 # image_path = r"D:\Pravi\burr_images\new_glass\station1\dataset\26_9_25\5mp\support_piston_ring\22.10.012\VCXU.2-57C\image0000118.bmp"  #  19.08.014
 # image_path = r"D:\Pravi\burr_images\new_glass\station1\dataset\5mp\27_9_25\VCXU.2-57C\image0000435.bmp"
 # image_path = r"D:\Pravi\slip_gauge\5_mp\dataset\25_9_25\parts\VCXU.2-57C\image0000071.bmp"
-image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam1\2025-10-05\13\cam1_2025-10-05_13-23-25.png.bmp"
+# image_path = r"D:\PIM_25-09-25\Pravi_Flask\static\Cam1InputImages\input_backup_cam1\2025-10-05\13\cam1_2025-10-05_13-23-25.png.bmp"
+image_path = r"D:\Pravi\testing\dataset\8_10_25\VCXU.2-57C\image0000473.bmp"
 frame = cv2.imread(image_path)
 
 # ==== CHANGE THESE VALUES TO TEST DIFFERENT PARTS ====
@@ -54,13 +55,13 @@ print(f"Output folder: {output_folder}")
 print(f"Backup folder: {backup_output_folder}")
 
 # ==== Parameters (adjust based on part type) ====
-id_min = "8.02"
-id_max = "8.08"
-od_min = "23.85"
-od_max = "23.95"
+id_min = "8.05"
+id_max = "8.15"
+od_min = "22.80"
+od_max = "23.10"
 concentricity_max = "0.10"
-orifice_min = "0"
-orifice_max = "1.07"
+orifice_min = "NA"
+orifice_max = "NA"
 threshold_id2 = "25"
 threshold_id3 = "10"
 threshold_od2 = "25"
